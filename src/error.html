@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Error - Client Portal</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<style>
+			* {
+				margin: 0;
+				padding: 0;
+				box-sizing: border-box;
+			}
+			
+			body {
+				font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+				background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+				min-height: 100vh;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				color: white;
+				line-height: 1.6;
+			}
+			
+			.error-container {
+				background: rgba(255, 255, 255, 0.1);
+				backdrop-filter: blur(10px);
+				border: 1px solid rgba(255, 255, 255, 0.2);
+				border-radius: 20px;
+				padding: 3rem 2rem;
+				max-width: 500px;
+				text-align: center;
+				box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+			}
+			
+			.error-icon {
+				font-size: 4rem;
+				margin-bottom: 1rem;
+				opacity: 0.8;
+			}
+			
+			h1 {
+				font-size: 2.5rem;
+				margin-bottom: 1rem;
+				font-weight: 700;
+			}
+			
+			p {
+				font-size: 1.1rem;
+				margin-bottom: 2rem;
+				opacity: 0.9;
+			}
+			
+			.error-code {
+				background: rgba(255, 255, 255, 0.1);
+				padding: 0.5rem 1rem;
+				border-radius: 10px;
+				font-family: 'Monaco', 'Consolas', monospace;
+				font-size: 0.9rem;
+				margin-bottom: 2rem;
+			}
+			
+			.actions {
+				display: flex;
+				gap: 1rem;
+				justify-content: center;
+				flex-wrap: wrap;
+			}
+			
+			.btn {
+				background: rgba(255, 255, 255, 0.2);
+				border: 1px solid rgba(255, 255, 255, 0.3);
+				color: white;
+				padding: 0.75rem 1.5rem;
+				border-radius: 10px;
+				text-decoration: none;
+				font-weight: 500;
+				transition: all 0.3s ease;
+				cursor: pointer;
+			}
+			
+			.btn:hover {
+				background: rgba(255, 255, 255, 0.3);
+				transform: translateY(-2px);
+			}
+			
+			.btn-primary {
+				background: rgba(103, 126, 234, 0.3);
+				border-color: rgba(103, 126, 234, 0.5);
+			}
+			
+			.btn-primary:hover {
+				background: rgba(103, 126, 234, 0.5);
+			}
+			
+			@media (max-width: 600px) {
+				.error-container {
+					margin: 1rem;
+					padding: 2rem 1.5rem;
+				}
+				
+				h1 {
+					font-size: 2rem;
+				}
+				
+				.actions {
+					flex-direction: column;
+					align-items: center;
+				}
+				
+				.btn {
+					width: 100%;
+					max-width: 200px;
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<div class="error-container">
+			<div class="error-icon">⚠️</div>
+			<h1>Something went wrong</h1>
+			<p>We apologize for the inconvenience. An unexpected error has occurred.</p>
+			<div class="error-code">Error ID: %sveltekit.error.id%</div>
+			<div class="actions">
+				<a href="/" class="btn btn-primary">Go Home</a>
+				<button onclick="window.history.back()" class="btn">Go Back</button>
+				<button onclick="window.location.reload()" class="btn">Retry</button>
+			</div>
+		</div>
+		
+		<script>
+			// Auto-reload after 30 seconds if it's a temporary error
+			if (window.location.search.includes('temporary=true')) {
+				setTimeout(() => {
+					window.location.reload();
+				}, 30000);
+			}
+		</script>
+	</body>
+</html>

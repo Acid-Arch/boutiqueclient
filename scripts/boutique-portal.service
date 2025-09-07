@@ -1,0 +1,65 @@
+# Systemd service file for Boutique Client Portal
+# Copy this file to /etc/systemd/system/boutique-portal.service
+# Then run: sudo systemctl enable boutique-portal && sudo systemctl start boutique-portal
+
+[Unit]
+Description=Boutique Client Portal - Instagram Account Management System
+Documentation=file:///home/george/dev/boutiqueclient/PRODUCTION_READINESS.md
+After=network.target postgresql.service
+Wants=network-online.target
+Requires=network.target
+
+[Service]
+Type=forking
+User=george
+Group=george
+WorkingDirectory=/home/george/dev/boutiqueclient
+
+# Environment configuration
+Environment=NODE_ENV=production
+Environment=PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
+EnvironmentFile=-/home/george/dev/boutiqueclient/.env.production
+
+# PM2 management
+ExecStart=/usr/bin/pm2 start /home/george/dev/boutiqueclient/ecosystem.config.js --env production
+ExecReload=/usr/bin/pm2 reload /home/george/dev/boutiqueclient/ecosystem.config.js --env production
+ExecStop=/usr/bin/pm2 stop /home/george/dev/boutiqueclient/ecosystem.config.js
+
+# Process management
+Restart=always
+RestartSec=10
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+# Security settings
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/george/dev/boutiqueclient/logs
+ReadWritePaths=/home/george/dev/boutiqueclient/build
+ReadWritePaths=/tmp
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+MemoryLimit=2G
+CPUQuota=200%
+
+# Logging
+StandardOutput=append:/home/george/dev/boutiqueclient/logs/systemd-out.log
+StandardError=append:/home/george/dev/boutiqueclient/logs/systemd-error.log
+SyslogIdentifier=boutique-portal
+
+# Health monitoring
+TimeoutStartSec=60
+TimeoutStopSec=30
+WatchdogSec=30
+
+[Install]
+WantedBy=multi-user.target
+Alias=boutique.service
+Alias=client-portal.service

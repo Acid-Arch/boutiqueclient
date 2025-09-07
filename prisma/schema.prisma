@@ -1,0 +1,429 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model IgAccount {
+  id                  Int                 @id @default(autoincrement())
+  recordId            String?             @unique @map("record_id") @db.VarChar(255)
+  instagramUsername   String              @unique @map("instagram_username") @db.VarChar(255)
+  instagramPassword   String              @map("instagram_password") @db.VarChar(255)
+  emailAddress        String              @map("email_address") @db.VarChar(255)
+  emailPassword       String              @map("email_password") @db.VarChar(255)
+  status              String              @default("Unused") @db.VarChar(50)
+  imapStatus          String              @default("On") @map("imap_status") @db.VarChar(10)
+  assignedDeviceId    String?             @map("assigned_device_id") @db.VarChar(255)
+  assignedCloneNumber Int?                @map("assigned_clone_number")
+  assignedPackageName String?             @map("assigned_package_name") @db.VarChar(255)
+  assignmentTimestamp DateTime?           @map("assignment_timestamp")
+  loginTimestamp      DateTime?           @map("login_timestamp")
+  createdAt           DateTime            @default(now()) @map("created_at")
+  updatedAt           DateTime            @default(now()) @updatedAt @map("updated_at")
+  
+  // Account ownership and classification fields
+  ownerId             Int?                // Which user owns this account (null = unassigned)
+  accountType         AccountType         @default(CLIENT) // CLIENT, ML_TREND_FINDER, SYSTEM
+  visibility          AccountVisibility   @default(PRIVATE) // PRIVATE, SHARED, PUBLIC
+  isShared            Boolean             @default(false) @map("is_shared") // Whether account can be shared with other users
+  
+  // Relations
+  owner               User?               @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+
+  @@index([assignedDeviceId], map: "idx_ig_accounts_assigned_device")
+  @@index([imapStatus], map: "idx_ig_accounts_imap_status")
+  @@index([status], map: "idx_ig_accounts_status")
+  @@index([instagramUsername], map: "idx_ig_accounts_username")
+  @@index([ownerId], map: "idx_ig_accounts_owner_id")
+  @@index([accountType], map: "idx_ig_accounts_account_type")
+  @@index([visibility], map: "idx_ig_accounts_visibility")
+  @@index([ownerId, accountType], map: "idx_ig_accounts_owner_type")
+  @@map("ig_accounts")
+}
+
+model CloneInventory {
+  id             Int      @id @default(autoincrement())
+  deviceId       String   @map("device_id") @db.VarChar(255)
+  cloneNumber    Int      @map("clone_number")
+  packageName    String   @map("package_name") @db.VarChar(255)
+  cloneStatus    String   @default("Available") @map("clone_status") @db.VarChar(50)
+  currentAccount String?  @map("current_account") @db.VarChar(255)
+  deviceName     String?  @map("device_name") @db.VarChar(255)
+  cloneHealth    String?  @map("clone_health") @db.VarChar(50)
+  lastScanned    DateTime @default(now()) @map("last_scanned")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@unique([deviceId, cloneNumber])
+  @@index([deviceId], map: "idx_clone_inventory_device")
+  @@index([deviceId, cloneNumber], map: "idx_clone_inventory_device_clone")
+  @@index([cloneStatus], map: "idx_clone_inventory_status")
+  @@map("clone_inventory")
+}
+
+model WarmupAccount {
+  id                Int      @id @default(autoincrement())
+  recordId          String?  @unique @map("record_id") @db.VarChar(255)
+  instagramUsername String   @map("instagram_username") @db.VarChar(255)
+  packageName       String   @map("package_name") @db.VarChar(255)
+  assignedDeviceId  String?  @map("assigned_device_id") @db.VarChar(255)
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@index([assignedDeviceId], map: "idx_warmup_accounts_device")
+  @@map("warmup_accounts")
+}
+
+
+// ===== USER MANAGEMENT MODELS =====
+
+model User {
+  id                Int       @id @default(autoincrement())
+  email             String    @unique @db.VarChar(255)
+  username          String    @unique @db.VarChar(100)
+  passwordHash      String?   @map("password_hash") @db.VarChar(255) // Nullable for OAuth users
+  
+  // Profile Information
+  firstName         String?   @map("first_name") @db.VarChar(100)
+  lastName          String?   @map("last_name") @db.VarChar(100)
+  company           String?   @db.VarChar(255)
+  avatar            String?   @db.VarChar(500) // URL to profile picture
+  
+  // Account Settings
+  role              UserRole  @default(CLIENT)
+  subscription      String    @default("Basic") @db.VarChar(50)
+  accountsLimit     Int       @default(10) @map("accounts_limit")
+  
+  // Account Status & Security
+  isActive          Boolean   @default(true) @map("is_active")
+  isVerified        Boolean   @default(false) @map("is_verified") 
+  emailVerified     Boolean   @default(false) @map("email_verified")
+  isTwoFactorEnabled Boolean  @default(false) @map("is_two_factor_enabled")
+  twoFactorEnabled  Boolean   @default(false) @map("two_factor_enabled")
+  twoFactorSecret   String?   @map("two_factor_secret") @db.VarChar(255)
+  backupCodes       Json?     @map("backup_codes") // Array of backup codes
+  
+  // Activity Tracking
+  lastLoginAt       DateTime? @map("last_login_at")
+  lastActiveAt      DateTime? @map("last_active_at")
+  loginAttempts     Int       @default(0) @map("login_attempts")
+  lockedUntil       DateTime? @map("locked_until")
+  
+  // Audit and Timestamps
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  
+  // Relations
+  ownedAccounts       IgAccount[] // Accounts owned by this user
+  auditLogs           AuditLog[]  // Security audit trail
+  userPreferences     UserPreference[]
+  loginAttemptsRel    LoginAttempt[]
+  passwordResetTokens PasswordResetToken[]
+  userSessions        UserSession[]
+  accounts            Account[]
+  sessions            Session[]
+  
+  @@index([email], map: "idx_users_email")
+  @@index([username], map: "idx_users_username")
+  @@index([role], map: "idx_users_role")
+  @@index([isActive], map: "idx_users_active")
+  @@index([lastLoginAt], map: "idx_users_last_login")
+  @@index([createdAt], map: "idx_users_created")
+  @@map("users")
+}
+
+
+model UserPreference {
+  id               Int       @id @default(autoincrement())
+  userId           Int       @map("user_id")
+  preferenceKey    String    @map("preference_key") @db.VarChar(100)
+  preferenceValue  String    @map("preference_value") @db.Text
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at")
+  
+  // Relations
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, preferenceKey])
+  @@index([userId], map: "idx_user_preferences_user_id")
+  @@index([preferenceKey], map: "idx_user_preferences_key")
+  @@map("user_preferences")
+}
+
+model LoginAttempt {
+  id              Int       @id @default(autoincrement())
+  userId          Int?      @map("user_id") // Null if user not found
+  email           String    @db.VarChar(255)
+  ipAddress       String    @map("ip_address") @db.VarChar(45) // IPv6 compatible
+  userAgent       String?   @map("user_agent") @db.Text
+  success         Boolean   @default(false)
+  failureReason   String?   @map("failure_reason") @db.VarChar(255)
+  timestamp       DateTime  @default(now())
+  
+  // Relations
+  user            User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  @@index([email], map: "idx_login_attempts_email")
+  @@index([ipAddress], map: "idx_login_attempts_ip")
+  @@index([timestamp], map: "idx_login_attempts_timestamp")
+  @@index([success], map: "idx_login_attempts_success")
+  @@map("login_attempts")
+}
+
+model PasswordResetToken {
+  id          Int       @id @default(autoincrement())
+  userId      Int       @map("user_id")
+  token       String    @unique @db.VarChar(255) // Hashed token
+  expiresAt   DateTime  @map("expires_at")
+  used        Boolean   @default(false)
+  ipAddress   String    @map("ip_address") @db.VarChar(45)
+  userAgent   String?   @map("user_agent") @db.Text
+  createdAt   DateTime  @default(now()) @map("created_at")
+  usedAt      DateTime? @map("used_at")
+  
+  // Relations
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId], map: "idx_password_reset_tokens_user")
+  @@index([token], map: "idx_password_reset_tokens_token")
+  @@index([expiresAt], map: "idx_password_reset_tokens_expires")
+  @@map("password_reset_tokens")
+}
+
+model UserSession {
+  id          String    @id @default(cuid())
+  userId      Int       @map("user_id")
+  sessionToken String   @unique @map("session_token") @db.VarChar(255)
+  ipAddress   String    @map("ip_address") @db.VarChar(45)
+  userAgent   String?   @map("user_agent") @db.Text
+  deviceInfo  Json?     @map("device_info") // Device fingerprint data
+  lastActivity DateTime @default(now()) @map("last_activity")
+  expiresAt   DateTime  @map("expires_at")
+  active      Boolean   @default(true)
+  rememberMe  Boolean   @default(false) @map("remember_me")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  
+  // Relations
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId], map: "idx_user_sessions_user")
+  @@index([sessionToken], map: "idx_user_sessions_token")
+  @@index([lastActivity], map: "idx_user_sessions_activity")
+  @@index([expiresAt], map: "idx_user_sessions_expires")
+  @@index([active], map: "idx_user_sessions_active")
+  @@map("user_sessions")
+}
+
+model AuditLog {
+  id          String      @id @default(cuid())
+  userId      Int?        @map("user_id") // Null for system events
+  eventType   AuditEventType @map("event_type")
+  description String?      @db.Text
+  details     Json?        // Additional event data
+  ipAddress   String?      @map("ip_address") @db.VarChar(45) // IPv4/IPv6
+  userAgent   String?      @map("user_agent") @db.Text
+  success     Boolean      @default(true)
+  errorMessage String?     @map("error_message") @db.Text
+  metadata    Json?        // Additional event-specific data
+  timestamp   DateTime     @default(now())
+  
+  // Relations
+  user        User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  @@index([userId], map: "idx_audit_logs_user_id")
+  @@index([eventType], map: "idx_audit_logs_event_type")
+  @@index([timestamp], map: "idx_audit_logs_timestamp")
+  @@index([ipAddress], map: "idx_audit_logs_ip_address")
+  @@index([success], map: "idx_audit_logs_success")
+  @@map("audit_logs")
+}
+
+// ===== AUTH.JS REQUIRED MODELS =====
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            Int     @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       Int      @map("user_id")
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+model ScrapingSession {
+  id                  String                @id @default(cuid())
+  sessionType         ScrapingSessionType   @map("session_type")
+  status              ScrapingSessionStatus @default(PENDING)
+  totalAccounts       Int                   @default(0) @map("total_accounts")
+  completedAccounts   Int                   @default(0) @map("completed_accounts")
+  failedAccounts      Int                   @default(0) @map("failed_accounts")
+  skippedAccounts     Int                   @default(0) @map("skipped_accounts")
+  progress            Int                   @default(0)
+  startTime           DateTime?             @map("start_time")
+  endTime             DateTime?             @map("end_time")
+  estimatedCompletion DateTime?             @map("estimated_completion")
+  totalRequestUnits   Int                   @default(0) @map("total_request_units")
+  estimatedCost       Float                 @default(0) @map("estimated_cost")
+  errorCount          Int                   @default(0) @map("error_count")
+  lastError           String?               @map("last_error")
+  triggeredBy         String?               @map("triggered_by")
+  triggerSource       String                @default("MANUAL") @map("trigger_source")
+  targetUsernames     Json?                 @map("target_usernames")
+  scrapingConfig      Json?                 @map("scraping_config")
+  createdAt           DateTime              @default(now()) @map("created_at")
+  updatedAt           DateTime              @default(now()) @updatedAt @map("updated_at")
+  
+  @@index([status], map: "idx_scraping_sessions_status")
+  @@index([sessionType], map: "idx_scraping_sessions_type")
+  @@index([createdAt], map: "idx_scraping_sessions_created")
+  @@index([triggerSource], map: "idx_scraping_sessions_trigger")
+  @@map("scraping_sessions")
+}
+
+// ===== ENUMS =====
+
+
+enum ScrapingStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  RATE_LIMITED
+  ACCOUNT_PRIVATE
+  ACCOUNT_NOT_FOUND
+  INSUFFICIENT_BALANCE
+  CANCELLED
+}
+
+enum ScrapingSessionType {
+  ACCOUNT_METRICS
+  FOLLOWER_ANALYSIS
+  CONTENT_ANALYSIS
+  COMPETITOR_ANALYSIS
+  HASHTAG_RESEARCH
+  TREND_ANALYSIS
+  BULK_UPDATE
+  HEALTH_CHECK
+}
+
+enum ScrapingSessionStatus {
+  PENDING
+  INITIALIZING
+  RUNNING
+  PAUSED
+  COMPLETED
+  FAILED
+  CANCELLED
+  RATE_LIMITED
+}
+
+enum ScrapingSource {
+  HIKER_API_CLIENT
+  ACCOUNT_SCRAPER
+  FOLLOWER_SCRAPER
+  CONTENT_SCRAPER
+  RATE_LIMITER
+  SESSION_MANAGER
+  DATA_VALIDATOR
+  COST_MONITOR
+}
+
+enum ScrapingStep {
+  INIT_SESSION
+  VALIDATE_ACCOUNT
+  FETCH_PROFILE
+  FETCH_FOLLOWERS
+  FETCH_FOLLOWING
+  FETCH_MEDIA
+  FETCH_STORIES
+  FETCH_HIGHLIGHTS
+  CALCULATE_METRICS
+  VALIDATE_DATA
+  STORE_RESULTS
+  CLEANUP
+}
+
+enum ScrapingErrorType {
+  RATE_LIMIT_EXCEEDED
+  INSUFFICIENT_BALANCE
+  ACCOUNT_NOT_FOUND
+  ACCOUNT_PRIVATE
+  NETWORK_ERROR
+  TIMEOUT_ERROR
+  AUTHENTICATION_ERROR
+  DATA_VALIDATION_ERROR
+  DATABASE_ERROR
+  UNKNOWN_ERROR
+}
+
+enum TriggerSource {
+  MANUAL
+  SCHEDULED
+  API
+  WEBHOOK
+}
+
+enum UserRole {
+  ADMIN
+  CLIENT
+  VIEWER
+  UNAUTHORIZED
+}
+
+enum AccountType {
+  CLIENT
+  ML_TREND_FINDER
+  SYSTEM
+}
+
+enum AccountVisibility {
+  PRIVATE
+  SHARED
+  PUBLIC
+}
+
+enum AuditEventType {
+  LOGIN_SUCCESS
+  LOGIN_FAILURE
+  LOGIN_BLOCKED_RATE_LIMIT
+  PASSWORD_RESET_REQUEST
+  PASSWORD_RESET_COMPLETE
+  PASSWORD_CHANGE
+  SESSION_INVALIDATED
+  TWO_FACTOR_ENABLED
+  TWO_FACTOR_DISABLED
+  ACCOUNT_LOCKED
+  ACCOUNT_UNLOCKED
+}

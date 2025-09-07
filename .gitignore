@@ -1,0 +1,133 @@
+# Environment variables - CRITICAL: Never commit these files
+.env
+.env.*
+!.env.*.example
+.env.local
+.env.development
+.env.production
+.env.staging
+.env.test
+
+# Backup environment files
+.env.backup*
+.env.old*
+
+# Secret files and certificates
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+secrets/
+certs/
+ssl/
+
+# Database dumps and backups
+*.sql
+*.dump
+*.db.backup
+database_backup*
+
+# Dependencies
+node_modules/
+.pnpm-debug.log*
+
+# Build output
+build/
+dist/
+.svelte-kit/
+
+# Development files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Runtime and process files
+*.pid
+*.seed
+*.pid.lock
+
+# Security and authentication files
+.auth/
+auth_tokens/
+session_store/
+*.session
+
+# Testing
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+
+# Cache directories
+.cache/
+.parcel-cache/
+
+# Temporary files
+*.tmp
+*.temp
+.tmp/
+temp/
+
+# Deployment secrets and configurations
+deployment.override.yml
+deployment.prod.yml
+
+# Kubernetes secrets
+k8s-secrets/
+*.k8s.yaml
+*-secret.yaml
+
+# Cloud provider configurations
+.aws/credentials
+.gcloud/
+azure-credentials.json
+terraform.tfvars
+terraform.tfstate*
+
+# Monitoring and APM keys
+.newrelic/
+datadog.conf
+sentry.conf
+
+# API keys and tokens (common naming patterns)
+*api-key*
+*api_key*
+*token*
+*secret*
+*password*
+*credentials*
+!*example*
+!*template*
+!*sample*
+
+# macOS and Windows
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Editor directories and files
+.vscode/settings.json
+.vscode/launch.json
+.vscode/extensions.json
+.idea/workspace.xml
+.idea/tasks.xml
+*.sublime-workspace
+
+# SECURITY WARNING: Double-check that no sensitive files are tracked
+# Use 'git status --ignored' to see ignored files
+# Use 'git log --oneline --name-only' to check for accidentally committed secrets

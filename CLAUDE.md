@@ -2,6 +2,14 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## ⚠️ CRITICAL DEPLOYMENT CONSTRAINT
+**This project deploys to NixOS ONLY using native NixOS packages.**
+- **NEVER suggest Docker** - This is a native NixOS deployment
+- **NEVER suggest Ubuntu/Debian solutions** - Use NixOS equivalents only
+- **NEVER use apt-get/yum** - Use nix-env for package management
+- **ALWAYS use systemd** for service management on NixOS
+- **USE patchelf** for binary compatibility issues, not containers
+
 ## Project Overview
 This is a client portal application that combines the robust backend infrastructure from Boutique Portal with the modern UI design system from the Frontend Template Kit. The project implements glass morphism design with SvelteKit, PostgreSQL, and comprehensive authentication.
 

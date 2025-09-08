@@ -1,7 +1,7 @@
 import type { RequestHandler } from './$types';
 import { json } from '@sveltejs/kit';
 import { logger, LogLevel } from '$lib/server/logging/logger.js';
-import { prisma } from '$lib/server/prisma.js';
+import { prisma } from '$lib/server/database.js';
 import { dev } from '$app/environment';
 
 interface HealthStatus {

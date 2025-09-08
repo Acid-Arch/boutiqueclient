@@ -1,9 +1,15 @@
 import type { PageServerLoad } from './$types';
+import { redirect } from '@sveltejs/kit';
 import { prisma } from '$lib/server/database';
 import { getAccountsFilterForUser, logUserModelAccess } from '$lib/server/model-access';
 import pg from 'pg';
 
 export const load: PageServerLoad = async ({ locals }) => {
+	// Add authentication guard - redirect to login if not authenticated
+	if (!locals.user) {
+		throw redirect(302, '/login');
+	}
+	
 	// Return the authenticated user data from our hooks
 	if (locals.user) {
 		try {

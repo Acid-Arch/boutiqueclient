@@ -172,15 +172,15 @@
 				<CardContent class="space-y-3">
 					<div class="flex items-center justify-between">
 						<span class="text-sm text-slate-300">Subscription</span>
-						<Badge class="bg-blue-500/20 text-blue-300">{data.user.subscription || 'Basic'}</Badge>
+						<Badge class="bg-blue-500/20 text-blue-300">{data.user?.subscription || 'Basic'}</Badge>
 					</div>
 					<div class="flex items-center justify-between">
 						<span class="text-sm text-slate-300">Account Limit</span>
-						<span class="text-sm text-white">{data.stats?.totalAccounts || 0} / {data.user.accountsLimit || 10}</span>
+						<span class="text-sm text-white">{data.stats?.totalAccounts || 0} / {data.user?.accountsLimit || 10}</span>
 					</div>
 					<div class="flex items-center justify-between">
 						<span class="text-sm text-slate-300">Status</span>
-						<Badge class="bg-green-500/20 text-green-300">{data.user.isActive ? 'Active' : 'Inactive'}</Badge>
+						<Badge class="bg-green-500/20 text-green-300">{data.user?.isActive ? 'Active' : 'Inactive'}</Badge>
 					</div>
 				</CardContent>
 			</Card>

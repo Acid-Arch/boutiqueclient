@@ -4,7 +4,7 @@ module.exports = {
       name: 'boutique-client-portal',
       script: 'build/index.js',
       cwd: '/opt/boutique-client/app',
-      instances: 'max', // Use all CPU cores
+      instances: 1, // Single instance for small server
       exec_mode: 'cluster',
       
       // Environment configuration
@@ -108,7 +108,7 @@ module.exports = {
       user: 'boutique-client',
       host: ['5.78.147.68'],
       ref: 'origin/main',
-      repo: 'git@github.com:yourusername/boutique-client-portal.git',
+      repo: 'https://github.com/Acid-Arch/boutiqueclient.git',
       path: '/opt/boutique-client',
       
       // Pre-deployment commands
@@ -121,7 +121,7 @@ module.exports = {
       user: 'boutique-client',
       host: ['5.78.147.68'],
       ref: 'origin/develop',
-      repo: 'git@github.com:yourusername/boutique-client-portal.git',
+      repo: 'https://github.com/Acid-Arch/boutiqueclient.git',
       path: '/opt/boutique-client-staging',
       
       'post-deploy': 'npm ci --production && PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1 npx prisma generate && npm run build && pm2 reload ecosystem.config.js --env staging'

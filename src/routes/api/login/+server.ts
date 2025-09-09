@@ -3,27 +3,36 @@ import type { RequestHandler } from './$types';
 import { validateIPAccess, recordFailedAttempt } from '$lib/server/ip-whitelist.ts';
 import { validateAPIRequest } from '$lib/server/validation/middleware.js';
 import { LoginSchema } from '$lib/server/validation/schemas.js';
-import { signIn } from '../../../../auth-production.ts';
+import { signIn } from '../../../auth-production.ts';
 
 export const POST: RequestHandler = async (event) => {
 	console.log('🔐 Login API endpoint called');
+	const { request } = event;
 	
-	// Comprehensive validation with rate limiting
-	const validation = await validateAPIRequest(event, {
-		bodySchema: LoginSchema,
-		rateLimit: {
-			requests: 5, // 5 attempts
-			windowMs: 15 * 60 * 1000 // per 15 minutes
-		},
-		logRequest: true
-	});
-
-	if (!validation.success) {
-		return validation.response;
+	let emailOrUsername: string;
+	let password: string;
+	let rememberMe: boolean = false;
+	
+	// Simple JSON parsing without middleware conflicts
+	try {
+		const body = await request.json();
+		emailOrUsername = body.emailOrUsername;
+		password = body.password;
+		rememberMe = body.rememberMe || false;
+		
+		// Basic validation
+		if (!emailOrUsername || !password) {
+			return json({
+				success: false,
+				error: 'Email and password are required'
+			}, { status: 400 });
+		}
+	} catch (error) {
+		return json({
+			success: false,
+			error: 'Invalid JSON in request body'
+		}, { status: 400 });
 	}
-
-	const { emailOrUsername, password, rememberMe } = validation.body!;
-	const { request, cookies } = event;
 	
 	try {
 		console.log('📧 Login attempt for:', emailOrUsername);

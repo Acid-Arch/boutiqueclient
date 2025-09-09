@@ -7,6 +7,7 @@ export default defineConfig({
 		port: 5874, // Custom port to avoid conflicts
 		strictPort: true,
 		host: true,
+		allowedHosts: ['all'], // Allow nginx proxy requests
 		headers: {
 			'Cross-Origin-Embedder-Policy': 'require-corp',
 			'Cross-Origin-Opener-Policy': 'same-origin'

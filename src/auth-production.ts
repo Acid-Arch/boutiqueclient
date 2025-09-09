@@ -7,9 +7,9 @@ import { AuthService } from '$lib/server/auth-direct.js';
 import { 
   GOOGLE_CLIENT_ID, 
   GOOGLE_CLIENT_SECRET, 
-  AUTH_SECRET,
-  PUBLIC_APP_URL 
+  AUTH_SECRET
 } from '$env/static/private';
+import { PUBLIC_APP_URL } from '$env/static/public';
 
 // Production authentication setup with Google OAuth
 // Supports both OAuth and credentials for fallback

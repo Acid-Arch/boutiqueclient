@@ -230,6 +230,11 @@ export const rateLimitErrorReport = (event: RequestEvent) => rateLimit(event, 'E
 
 // Middleware function that can be used in hooks
 export async function rateLimitMiddleware(event: RequestEvent): Promise<Response | null> {
+	// Check if rate limiting is disabled via environment variable
+	if (process.env.DISABLE_RATE_LIMITING === 'true') {
+		return null;
+	}
+	
 	const { url, request } = event;
 	const path = url.pathname;
 	const method = request.method;

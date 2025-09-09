@@ -114,9 +114,5 @@ export const POST: RequestHandler = async (event) => {
 	}
 };
 
-// Rate limiting for error reporting (prevent spam)
-export const RATE_LIMIT = {
-	windowMs: 60 * 1000, // 1 minute
-	max: 10, // 10 error reports per minute per IP
-	message: 'Too many error reports from this IP'
-};
+// Rate limiting configuration for error reporting (prevent spam)
+// This is handled by the rateLimitErrorReport function above

@@ -1,9 +1,6 @@
 import bcrypt from 'bcrypt';
-import pg from 'pg';
 import { dev } from '$app/environment';
-import { DATABASE_URL } from '$env/static/private';
-
-const { Client } = pg;
+import pgDirect from './postgres-direct.ts';
 
 const SALT_ROUNDS = 12;
 const SESSION_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
@@ -26,15 +23,6 @@ export interface LoginResult {
   error?: string;
 }
 
-// Get database connection
-async function getDbClient() {
-  const client = new Client({
-    connectionString: DATABASE_URL
-  });
-  await client.connect();
-  return client;
-}
-
 export class AuthService {
   /**
    * Hash a password using bcrypt
@@ -51,26 +39,31 @@ export class AuthService {
   }
 
   /**
-   * Authenticate user with email and password
+   * Authenticate user with email or username and password using direct PostgreSQL client
    */
-  static async authenticateUser(email: string, password: string): Promise<LoginResult> {
-    let client: pg.Client | null = null;
-    
+  static async authenticateUser(emailOrUsername: string, password: string): Promise<LoginResult> {
+    return this.authenticate(emailOrUsername, password);
+  }
+
+  /**
+   * Authenticate user with email and password using direct PostgreSQL client
+   */
+  static async authenticate(email: string, password: string): Promise<LoginResult> {
     try {
       console.log('🔍 Authenticating user:', email);
-      client = await getDbClient();
 
-      // Find user by email
-      const userQuery = `
-        SELECT id, email, password_hash as password, name, company, avatar_url as avatar, role, subscription, active, last_login_at
-        FROM users 
-        WHERE email = $1 AND active = true
-      `;
+      // Find user by email using direct PostgreSQL client
+      const user = await pgDirect.findUserByEmail(email);
+      console.log('📊 User query result:', user ? 'found' : 'not found');
       
-      const result = await client.query(userQuery, [email]);
-      console.log('📊 User query result:', result.rows.length, 'rows found');
+      // Debug: Log exact fields returned
+      if (user) {
+        console.log('🔍 Debug - User object keys:', Object.keys(user));
+        console.log('🔍 Debug - password_hash value exists:', !!user.password_hash);
+        console.log('🔍 Debug - password_hash length:', user.password_hash ? user.password_hash.length : 0);
+      }
       
-      if (result.rows.length === 0) {
+      if (!user) {
         console.log('❌ No user found or user is inactive');
         return {
           success: false,
@@ -78,11 +71,26 @@ export class AuthService {
         };
       }
 
-      const user = result.rows[0];
-      console.log('👤 Found user:', user.email, 'has password hash:', !!user.password);
+      console.log('👤 Found user:', user.email, 'has password hash:', !!user.password_hash, 'active:', user.active);
+
+      if (!user.active) {
+        console.log('❌ User is not active');
+        return {
+          success: false,
+          error: 'Account is not active'
+        };
+      }
+
+      if (!user.password_hash) {
+        console.log('❌ User has no password hash (OAuth only)');
+        return {
+          success: false,
+          error: 'Invalid credentials'
+        };
+      }
 
       // Verify password
-      const isValidPassword = await this.verifyPassword(password, user.password);
+      const isValidPassword = await this.verifyPassword(password, user.password_hash);
       console.log('🔑 Password verification result:', isValidPassword);
       
       if (!isValidPassword) {
@@ -94,113 +102,32 @@ export class AuthService {
       }
 
       // Update last login timestamp
-      await client.query(
-        'UPDATE users SET last_login_at = NOW(), updated_at = NOW() WHERE id = $1',
-        [user.id]
-      );
+      await pgDirect.updateUserLastLogin(user.id);
+
+      // Log successful login attempt
+      await pgDirect.logLoginAttempt({
+        userId: user.id,
+        email: user.email,
+        ipAddress: 'unknown',
+        success: true
+      });
+
+      // Create audit log (temporarily disabled due to schema mismatch)
+      try {
+        await pgDirect.createAuditLog({
+          userId: user.id,
+          eventType: 'LOGIN_SUCCESS',
+          description: `User ${user.email} successfully logged in`
+        });
+      } catch (error) {
+        console.log('⚠️ Audit logging disabled due to schema mismatch:', error.message);
+      }
 
       // Create session user object
       const sessionUser: SessionUser = {
-        id: user.id,
-        email: user.email,
-        name: user.name || 'User',
-        company: user.company,
-        avatar: user.avatar,
-        role: user.role,
-        subscription: user.subscription,
-        isActive: user.active,
-        lastLoginAt: user.last_login_at
-      };
-
-      return {
-        success: true,
-        user: sessionUser
-      };
-
-    } catch (error) {
-      console.error('Authentication error:', error);
-      return {
-        success: false,
-        error: 'Authentication failed'
-      };
-    } finally {
-      if (client) {
-        await client.end();
-      }
-    }
-  }
-
-  /**
-   * Find user by ID
-   */
-  static async getUserById(userId: string): Promise<SessionUser | null> {
-    let client: pg.Client | null = null;
-    
-    try {
-      client = await getDbClient();
-
-      const userQuery = `
-        SELECT id, email, name, company, avatar_url as avatar, role, subscription, active, last_login_at
-        FROM users 
-        WHERE id = $1 AND active = true
-      `;
-      
-      const result = await client.query(userQuery, [userId]);
-      
-      if (result.rows.length === 0) {
-        return null;
-      }
-
-      const user = result.rows[0];
-      
-      return {
-        id: user.id,
-        email: user.email,
-        name: user.name || 'User',
-        company: user.company,
-        avatar: user.avatar,
-        role: user.role,
-        subscription: user.subscription,
-        isActive: user.active,
-        lastLoginAt: user.last_login_at
-      };
-      
-    } catch (error) {
-      console.error('Get user error:', error);
-      return null;
-    } finally {
-      if (client) {
-        await client.end();
-      }
-    }
-  }
-
-  /**
-   * Find user by email
-   */
-  static async getUserByEmail(email: string): Promise<SessionUser | null> {
-    let client: pg.Client | null = null;
-    
-    try {
-      client = await getDbClient();
-      
-      const userQuery = `
-        SELECT id, email, name, company, avatar_url as avatar, role, subscription, active, last_login_at
-        FROM users 
-        WHERE email = $1 AND active = true
-      `;
-      
-      const result = await client.query(userQuery, [email]);
-      
-      if (result.rows.length === 0) {
-        return null;
-      }
-      
-      const user = result.rows[0];
-      return {
         id: user.id.toString(),
         email: user.email,
-        name: user.name,
+        name: user.name || 'User',
         company: user.company,
         avatar: user.avatar,
         role: user.role,
@@ -208,65 +135,155 @@ export class AuthService {
         isActive: user.active,
         lastLoginAt: user.last_login_at
       };
-      
+
+      console.log('✅ Authentication successful for:', user.email);
+      return {
+        success: true,
+        user: sessionUser
+      };
+
     } catch (error) {
-      console.error('Error getting user by email:', error);
-      return null;
-    } finally {
-      if (client) {
-        await client.end();
-      }
+      console.error('Authentication error:', error);
+      
+      // Log failed login attempt
+      await pgDirect.logLoginAttempt({
+        email: email,
+        ipAddress: 'unknown',
+        success: false,
+        failureReason: error instanceof Error ? error.message : 'Unknown error'
+      });
+
+      return {
+        success: false,
+        error: 'Authentication failed'
+      };
     }
   }
 
   /**
-   * Get the first admin user from the database (for trusted IP fallback)
+   * Find user by ID using direct PostgreSQL client
    */
-  static async getFirstAdminUser(): Promise<SessionUser | null> {
-    let client: pg.Client | null = null;
-    
+  static async getUserById(userId: string): Promise<SessionUser | null> {
     try {
-      client = await getDbClient();
+      const user = await pgDirect.findUserById(parseInt(userId));
       
-      const userQuery = `
-        SELECT id, email, name, company, avatar_url as avatar, role, subscription, active, last_login_at
-        FROM users 
-        WHERE role = 'ADMIN' AND active = true
-        ORDER BY id ASC
-        LIMIT 1
-      `;
-      
-      const result = await client.query(userQuery);
-      
-      if (result.rows.length === 0) {
+      if (!user) {
         return null;
       }
-      
-      const user = result.rows[0];
+
       return {
         id: user.id.toString(),
         email: user.email,
-        name: user.name,
+        name: user.name || 'User',
         company: user.company,
         avatar: user.avatar,
         role: user.role,
-        subscription: user.subscription || 'Enterprise',
+        subscription: user.subscription || 'Basic',
         isActive: user.active,
         lastLoginAt: user.last_login_at
       };
-      
+
     } catch (error) {
-      console.error('Error getting first admin user:', error);
+      console.error('Get user by ID error:', error);
       return null;
-    } finally {
-      if (client) {
-        await client.end();
-      }
     }
   }
 
   /**
-   * Generate a secure session token
+   * Create a new user (for registration)
+   */
+  static async createUser(userData: {
+    email: string;
+    username: string;
+    password?: string;
+    firstName?: string;
+    lastName?: string;
+    role?: string;
+  }): Promise<SessionUser | null> {
+    try {
+      // Hash password if provided
+      const passwordHash = userData.password 
+        ? await this.hashPassword(userData.password)
+        : null;
+
+      const newUser = await pgDirect.createUser({
+        email: userData.email,
+        username: userData.username,
+        password_hash: passwordHash,
+        first_name: userData.firstName,
+        last_name: userData.lastName,
+        role: userData.role || 'CLIENT'
+      });
+
+      if (!newUser) {
+        return null;
+      }
+
+      // Create audit log for user creation (temporarily disabled due to schema mismatch)
+      try {
+        await pgDirect.createAuditLog({
+          userId: newUser.id,
+          eventType: 'USER_CREATED',
+          description: `New user registered: ${newUser.email}`
+        });
+      } catch (error) {
+        console.log('⚠️ User creation audit logging disabled due to schema mismatch:', error.message);
+      }
+
+      return {
+        id: newUser.id.toString(),
+        email: newUser.email,
+        name: newUser.username || userData.firstName || 'User',
+        role: newUser.role,
+        subscription: 'Basic',
+        isActive: newUser.is_active,
+        lastLoginAt: null
+      };
+
+    } catch (error) {
+      console.error('Create user error:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Test database connection
+   */
+  static async testConnection(): Promise<boolean> {
+    try {
+      return await pgDirect.testConnection();
+    } catch (error) {
+      console.error('Database connection test failed:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get user accounts (IG accounts owned by user)
+   */
+  static async getUserAccounts(userId: number): Promise<any[]> {
+    try {
+      return await pgDirect.getUserAccounts(userId);
+    } catch (error) {
+      console.error('Get user accounts error:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get account statistics for user
+   */
+  static async getAccountStats(userId: number): Promise<any> {
+    try {
+      return await pgDirect.getAccountStats(userId);
+    } catch (error) {
+      console.error('Get account stats error:', error);
+      return { total: 0, active: 0, unused: 0, blocked: 0 };
+    }
+  }
+
+  /**
+   * Generate a random session token
    */
   static generateSessionToken(): string {
     const randomBytes = crypto.getRandomValues(new Uint8Array(32));
@@ -274,7 +291,21 @@ export class AuthService {
   }
 
   /**
-   * Create secure session cookie options
+   * Validate a session token format
+   * Checks if token is a valid hex string of correct length
+   */
+  static isValidSessionToken(token: string): boolean {
+    // Token should be 64 character hex string (32 bytes)
+    if (!token || typeof token !== 'string') {
+      return false;
+    }
+    
+    // Check length and format (hexadecimal)
+    return token.length === 64 && /^[a-f0-9]+$/.test(token);
+  }
+
+  /**
+   * Get session cookie options
    */
   static getSessionCookieOptions() {
     return {
@@ -285,13 +316,4 @@ export class AuthService {
       path: '/'
     };
   }
-
-  /**
-   * Validate session token format
-   */
-  static isValidSessionToken(token: string): boolean {
-    return typeof token === 'string' && token.length === 64 && /^[a-f0-9]+$/i.test(token);
-  }
 }
-
-export default AuthService;

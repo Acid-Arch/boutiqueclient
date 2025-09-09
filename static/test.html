@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Page - No CSP</title>
+    <style>
+        body {
+            background: linear-gradient(135deg, #1e1e2e, #313244);
+            color: white;
+            font-family: Arial, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .container {
+            text-align: center;
+            padding: 40px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .login-form {
+            margin-top: 30px;
+        }
+        input {
+            display: block;
+            width: 300px;
+            padding: 12px;
+            margin: 10px auto;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border-radius: 8px;
+        }
+        button {
+            padding: 12px 30px;
+            background: #7c3aed;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        button:hover {
+            background: #6d28d9;
+        }
+        .status {
+            margin-top: 20px;
+            color: #10b981;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎉 STATIC PAGE WORKING!</h1>
+        <p>This page bypasses SvelteKit completely</p>
+        
+        <div class="login-form">
+            <h3>Test Login Form</h3>
+            <input type="text" placeholder="Username" id="username" value="admin">
+            <input type="password" placeholder="Password" id="password" value="boutique2024!">
+            <button onclick="testLogin()">Test Login</button>
+            <div class="status" id="status"></div>
+        </div>
+    </div>
+
+    <script>
+        function testLogin() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const status = document.getElementById('status');
+            
+            status.innerHTML = 'Testing login...';
+            
+            fetch('/api/auth/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ username, password })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    status.innerHTML = '✅ Login successful!';
+                } else {
+                    status.innerHTML = '❌ Login failed: ' + (data.error || 'Unknown error');
+                }
+            })
+            .catch(error => {
+                status.innerHTML = '❌ Error: ' + error.message;
+            });
+        }
+        
+        // Test if JavaScript works
+        console.log('✅ JavaScript is working!');
+        document.querySelector('h1').style.color = '#10b981';
+    </script>
+</body>
+</html>

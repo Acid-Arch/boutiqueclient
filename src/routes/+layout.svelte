@@ -140,19 +140,19 @@
 				console.log('🔐 Custom logout API call failed:', fetchError);
 			}
 			
-			// Use Auth.js signOut to properly clear JWT sessions
+			// Try Auth.js signOut but don't wait for it (it's failing silently)
 			try {
 				if (typeof signOut !== 'undefined') {
-					console.log('🔐 Using Auth.js signOut');
-					await signOut({ callbackUrl: '/login', redirect: true });
-					return; // Let Auth.js handle the redirect
+					console.log('🔐 Attempting Auth.js signOut (non-blocking)');
+					// Don't await - just fire and forget since it's not working properly
+					signOut({ callbackUrl: '/login', redirect: false });
 				}
 			} catch (authError) {
 				console.log('🔐 Auth.js signOut failed:', authError);
 			}
 			
-			// Fallback: Clear client-side storage and cookies
-			console.log('🔐 Using fallback logout method');
+			// Always clear client-side storage and cookies manually
+			console.log('🔐 Clearing client-side data and redirecting');
 			if (typeof localStorage !== 'undefined') {
 				localStorage.clear();
 			}
@@ -165,7 +165,7 @@
 				document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
 			});
 			
-			// Force redirect to login
+			// Always force redirect to login
 			console.log('🔐 Redirecting to login...');
 			window.location.href = '/login';
 			

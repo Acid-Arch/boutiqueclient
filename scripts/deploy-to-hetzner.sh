@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Boutique Client Portal - Hetzner Server Deployment Script
 # IP-Only Deployment to 5.78.147.68
@@ -8,11 +8,11 @@ set -e  # Exit on any error
 
 # Configuration
 SERVER_IP="5.78.147.68"
-SERVER_USER="root"  # Will switch to boutique-client user after setup
+SERVER_USER="admin"  # Will switch to boutique-client user after setup
 SERVICE_USER="boutique-client"
 APP_DIR="/opt/boutique-client"
 LOG_DIR="$APP_DIR/logs"
-REPO_URL="${REPO_URL:-git@github.com:yourusername/boutique-client-portal.git}"
+REPO_URL="${REPO_URL:-local-transfer}"
 
 # Colors for output
 RED='\033[0;31m'
@@ -89,7 +89,11 @@ run_remote() {
     local user=$1
     local cmd=$2
     log "Running on server as $user: $cmd"
-    ssh -o StrictHostKeyChecking=no "$user@$SERVER_IP" "$cmd"
+    if [ "$user" = "admin" ] && [[ "$cmd" == *"apt-get"* || "$cmd" == *"systemctl"* || "$cmd" == *"ufw"* || "$cmd" == *"useradd"* || "$cmd" == *"mkdir -p /opt"* || "$cmd" == *"chown"* || "$cmd" == *"ln -sf /etc"* || "$cmd" == *"nginx -t"* ]]; then
+        echo "SecurePassword#123" | ssh -o StrictHostKeyChecking=no "$user@$SERVER_IP" "sudo -S $cmd"
+    else
+        ssh -o StrictHostKeyChecking=no "$user@$SERVER_IP" "$cmd"
+    fi
 }
 
 # Function to copy files to server
@@ -105,55 +109,53 @@ copy_to_server() {
 setup_server() {
     log "Starting initial server setup on $SERVER_IP"
     
-    # System updates and package installation
-    log "Updating system and installing packages..."
-    run_remote root "apt-get update && apt-get upgrade -y"
-    run_remote root "apt-get install -y curl git nginx postgresql-client ufw fail2ban htop vim unzip"
+    # NixOS system updates and package installation
+    log "Updating NixOS system and installing packages..."
     
-    # Install Node.js 18.x
-    log "Installing Node.js..."
-    run_remote root "curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -"
-    run_remote root "apt-get install -y nodejs"
+    # For NixOS, we need to modify configuration.nix or use nix-env
+    log "Installing packages with nix-env..."
+    run_remote admin "nix-env -iA nixos.curl nixos.git nixos.nginx nixos.postgresql nixos.htop nixos.vim nixos.unzip || true"
     
-    # Install PM2 globally
-    log "Installing PM2..."
-    run_remote root "npm install -g pm2"
+    # Install Node.js 20 (current LTS) and PM2
+    log "Installing Node.js 20 and PM2..."
+    run_remote admin "nix-env -iA nixos.nodejs_20 nixos.nodePackages.npm || nix-env -iA nixos.nodejs nixos.nodePackages.npm"
+    run_remote admin "npm install -g pm2 || nix-env -iA nixos.nodePackages.pm2"
     
-    # Create service user
+    # Create service user (NixOS compatible)
     log "Creating service user: $SERVICE_USER"
-    run_remote root "useradd -m -s /bin/bash $SERVICE_USER || true"
-    run_remote root "usermod -aG sudo $SERVICE_USER || true"
+    echo "SecurePassword#123" | ssh -o StrictHostKeyChecking=no "admin@$SERVER_IP" "sudo -S useradd -m -s \$(which bash) $SERVICE_USER || true"
+    echo "SecurePassword#123" | ssh -o StrictHostKeyChecking=no "admin@$SERVER_IP" "sudo -S usermod -aG wheel $SERVICE_USER || true"
     
     # Create directory structure
     log "Creating directory structure..."
-    run_remote root "mkdir -p $APP_DIR $LOG_DIR"
-    run_remote root "chown -R $SERVICE_USER:$SERVICE_USER $APP_DIR"
-    run_remote root "chmod -R 755 $APP_DIR"
+    echo "SecurePassword#123" | ssh -o StrictHostKeyChecking=no "admin@$SERVER_IP" "sudo -S mkdir -p $APP_DIR $LOG_DIR"
+    echo "SecurePassword#123" | ssh -o StrictHostKeyChecking=no "admin@$SERVER_IP" "sudo -S chown -R $SERVICE_USER:users $APP_DIR"
+    echo "SecurePassword#123" | ssh -o StrictHostKeyChecking=no "admin@$SERVER_IP" "sudo -S chmod -R 755 $APP_DIR"
     
-    # Configure UFW firewall
-    log "Configuring firewall..."
-    run_remote root "ufw --force reset"
-    run_remote root "ufw default deny incoming"
-    run_remote root "ufw default allow outgoing"
-    run_remote root "ufw allow ssh"
-    run_remote root "ufw allow 80/tcp"
-    run_remote root "ufw allow 3000/tcp"  # SvelteKit app
-    run_remote root "ufw allow 8081/tcp"  # WebSocket
-    run_remote root "ufw --force enable"
+    # Configure NixOS firewall
+    log "Configuring NixOS firewall..."
+    # Note: For NixOS, firewall is typically configured in configuration.nix
+    # For now, let's configure iptables directly (temporary approach)
+    echo "SecurePassword#123" | ssh -o StrictHostKeyChecking=no "admin@$SERVER_IP" "sudo -S iptables -F || true"
+    echo "SecurePassword#123" | ssh -o StrictHostKeyChecking=no "admin@$SERVER_IP" "sudo -S iptables -A INPUT -p tcp --dport 22 -j ACCEPT"
+    echo "SecurePassword#123" | ssh -o StrictHostKeyChecking=no "admin@$SERVER_IP" "sudo -S iptables -A INPUT -p tcp --dport 80 -j ACCEPT"
+    echo "SecurePassword#123" | ssh -o StrictHostKeyChecking=no "admin@$SERVER_IP" "sudo -S iptables -A INPUT -p tcp --dport 3000 -j ACCEPT"
+    echo "SecurePassword#123" | ssh -o StrictHostKeyChecking=no "admin@$SERVER_IP" "sudo -S iptables -A INPUT -p tcp --dport 8081 -j ACCEPT"
+    log "Firewall rules applied (temporary iptables rules)"
     
-    # Copy and configure Nginx
-    log "Configuring Nginx..."
-    copy_to_server "nginx-production-ip.conf" "/etc/nginx/sites-available/boutique-client" root
-    run_remote root "ln -sf /etc/nginx/sites-available/boutique-client /etc/nginx/sites-enabled/"
-    run_remote root "rm -f /etc/nginx/sites-enabled/default"
-    run_remote root "nginx -t"
-    run_remote root "systemctl enable nginx"
-    run_remote root "systemctl restart nginx"
+    # Configure Nginx for NixOS
+    log "Configuring Nginx for NixOS..."
+    # Copy nginx config
+    scp nginx-production-ip.conf admin@$SERVER_IP:/tmp/
+    echo "SecurePassword#123" | ssh -o StrictHostKeyChecking=no "admin@$SERVER_IP" "sudo -S mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled"
+    echo "SecurePassword#123" | ssh -o StrictHostKeyChecking=no "admin@$SERVER_IP" "sudo -S mv /tmp/nginx-production-ip.conf /etc/nginx/sites-available/boutique-client"
+    echo "SecurePassword#123" | ssh -o StrictHostKeyChecking=no "admin@$SERVER_IP" "sudo -S ln -sf /etc/nginx/sites-available/boutique-client /etc/nginx/sites-enabled/"
+    echo "SecurePassword#123" | ssh -o StrictHostKeyChecking=no "admin@$SERVER_IP" "sudo -S rm -f /etc/nginx/sites-enabled/default"
     
-    # Configure fail2ban
-    log "Configuring fail2ban..."
-    run_remote root "systemctl enable fail2ban"
-    run_remote root "systemctl start fail2ban"
+    # Start nginx with NixOS
+    log "Starting Nginx service..."
+    echo "SecurePassword#123" | ssh -o StrictHostKeyChecking=no "admin@$SERVER_IP" "sudo -S systemctl enable nginx || sudo -S service nginx start || nginx"
+    echo "SecurePassword#123" | ssh -o StrictHostKeyChecking=no "admin@$SERVER_IP" "sudo -S systemctl start nginx || sudo -S service nginx restart || true"
     
     log "✅ Server setup completed successfully!"
     log "Next steps: run '$0 deploy' to deploy the application"
@@ -163,15 +165,33 @@ setup_server() {
 deploy_app() {
     log "Starting application deployment..."
     
-    # Switch to service user for deployment
-    log "Cloning/updating repository..."
-    run_remote $SERVICE_USER "cd $APP_DIR && { 
-        if [ -d app/.git ]; then 
-            cd app && git fetch origin && git reset --hard origin/$BRANCH && git clean -fd
-        else 
-            rm -rf app && git clone $REPO_URL app && cd app && git checkout $BRANCH
-        fi
-    }"
+    # Transfer application files
+    log "Transferring application files..."
+    
+    # Create tarball excluding unnecessary files
+    log "Creating deployment package..."
+    tar -czf /tmp/boutique-client-deploy.tar.gz \
+        --exclude=node_modules \
+        --exclude=.git \
+        --exclude=.playwright-mcp \
+        --exclude=.svelte-kit \
+        --exclude=build \
+        --exclude="*.log" \
+        --exclude="*.tmp" \
+        .
+    
+    # Transfer to server
+    scp /tmp/boutique-client-deploy.tar.gz admin@$SERVER_IP:/tmp/
+    
+    # Extract on server
+    echo "SecurePassword#123" | ssh -o StrictHostKeyChecking=no "admin@$SERVER_IP" "sudo -S rm -rf $APP_DIR/app"
+    echo "SecurePassword#123" | ssh -o StrictHostKeyChecking=no "admin@$SERVER_IP" "sudo -S mkdir -p $APP_DIR/app"
+    echo "SecurePassword#123" | ssh -o StrictHostKeyChecking=no "admin@$SERVER_IP" "sudo -S chown $SERVICE_USER:$SERVICE_USER $APP_DIR/app"
+    run_remote $SERVICE_USER "cd $APP_DIR && tar -xzf /tmp/boutique-client-deploy.tar.gz -C app --strip-components=0"
+    
+    # Clean up
+    rm /tmp/boutique-client-deploy.tar.gz
+    run_remote admin "rm /tmp/boutique-client-deploy.tar.gz"
     
     # Install dependencies
     if [ "$SKIP_DEPS" != true ]; then
@@ -213,9 +233,9 @@ deploy_app() {
         pm2 save
     }"
     
-    # Setup PM2 startup (as root)
+    # Setup PM2 startup (as admin with sudo)
     log "Configuring PM2 startup..."
-    run_remote root "env PATH=\$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u $SERVICE_USER --hp /home/$SERVICE_USER"
+    echo "SecurePassword#123" | ssh -o StrictHostKeyChecking=no "admin@$SERVER_IP" "sudo -S env PATH=\$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u $SERVICE_USER --hp /home/$SERVICE_USER"
     
     log "✅ Application deployment completed successfully!"
 }
@@ -224,7 +244,7 @@ deploy_app() {
 restart_services() {
     log "Restarting services..."
     run_remote $SERVICE_USER "cd $APP_DIR/app && pm2 restart all"
-    run_remote root "systemctl restart nginx"
+    run_remote admin "systemctl restart nginx"
     log "✅ Services restarted successfully!"
 }
 

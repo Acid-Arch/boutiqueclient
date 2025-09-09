@@ -292,7 +292,7 @@ export interface IPWhitelistConfig {
 
 export function getIPWhitelistConfig(): IPWhitelistConfig {
   return {
-    enabled: process.env.IP_WHITELIST_ENABLED === 'true',
+    enabled: false, // DISABLED: IP whitelist validation disabled per user request
     mode: (process.env.IP_WHITELIST_MODE as 'strict' | 'permissive') || 'strict',
     adminBypass: process.env.IP_WHITELIST_BYPASS_ADMIN === 'true',
     devBypass: process.env.IP_WHITELIST_DEV_BYPASS === 'true' && process.env.NODE_ENV === 'development',

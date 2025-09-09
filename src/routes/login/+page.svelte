@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { signIn } from '@auth/sveltekit/client';
 	import { page } from '$app/stores';
+	import { goto, invalidateAll } from '$app/navigation';
 	import { Button } from '$lib/components/ui/button';
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Badge } from '$lib/components/ui/badge';
@@ -9,7 +10,6 @@
 	import { LogIn, Shield, Users, BarChart3, Eye, EyeOff, Mail, Lock, Loader2 } from 'lucide-svelte';
 	import { onMount } from 'svelte';
 
-	let mounted = false;
 	let loginMethod = 'oauth'; // 'oauth' or 'email'
 	let showPassword = false;
 	let isLoading = false;
@@ -19,11 +19,12 @@
 	let email = 'jorge.test@gmail.com';
 	let password = 'testpassword123';
 
-	// Get any error from URL params
-	$: error = $page.url.searchParams.get('error') || $page.url.searchParams.get('reason');
-
+	// Get any error from URL params (with fallback for SSR)
+	let error = '';
+	
+	// Progressive enhancement - set error after client-side hydration
 	onMount(() => {
-		mounted = true;
+		error = $page.url.searchParams.get('error') || $page.url.searchParams.get('reason') || '';
 	});
 
 	async function handleGoogleSignIn() {
@@ -49,21 +50,22 @@
 		loginError = '';
 
 		try {
-			const response = await fetch('/api/auth/login', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({ emailOrUsername: email, password })
+			// Use Auth.js signIn with credentials provider directly
+			const result = await signIn('credentials', {
+				email: email,
+				password: password,
+				redirect: false
 			});
 
-			const result = await response.json();
-
-			if (result.success) {
-				// Redirect to client portal
-				window.location.href = '/client-portal';
+			if (result?.error) {
+				loginError = 'Invalid credentials';
+			} else if (result?.ok) {
+				// Auth.js handles session creation automatically
+				// Invalidate all cached data and redirect to client portal
+				await invalidateAll();
+				await goto('/client-portal', { replaceState: true });
 			} else {
-				loginError = result.error || 'Login failed';
+				loginError = 'Login failed';
 			}
 		} catch (err) {
 			loginError = 'Network error. Please try again.';
@@ -86,8 +88,8 @@
 	<meta name="description" content="Login to your Client Portal" />
 </svelte:head>
 
-{#if mounted}
-	<div class="min-h-screen flex items-center justify-center p-4">
+<!-- Always render login form for server-side rendering -->
+<div class="min-h-screen flex items-center justify-center p-4">
 		<div class="w-full max-w-md space-y-6">
 			<!-- Logo/Brand -->
 			<div class="text-center">
@@ -252,5 +254,4 @@
 				<p>Secure login powered by Google OAuth</p>
 			</div>
 		</div>
-	</div>
-{/if}
+</div>

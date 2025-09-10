@@ -6,8 +6,8 @@ class PostgresDirectClient {
     private static instance: PostgresDirectClient;
 
     private constructor() {
-        console.log('🔍 PostgreSQL Connection Configuration:');
-        console.log('- Fallback: SSL configuration failed, switching to sslmode=disable');
+        console.log('🔍 PostgreSQL Direct Connection (NixOS Compatible):');
+        console.log('- Using direct PostgreSQL client for NixOS deployment');
         
         // Override the DATABASE_URL to use sslmode=disable for this deployment
         // The server environment has sslmode=require but the database uses self-signed certs
@@ -22,7 +22,7 @@ class PostgresDirectClient {
             console.log('- Added sslmode=disable to connection string');
         }
         
-        console.log('- SSL disabled for deployment compatibility');
+        console.log('- SSL disabled for deployment compatibility (expected on NixOS)');
         
         this.pool = new Pool({
             connectionString: connectionString,

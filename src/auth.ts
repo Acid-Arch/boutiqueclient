@@ -94,7 +94,7 @@ providers.push(
   })
 );
 
-const baseUrl = PUBLIC_APP_URL || 'http://silentsignal.io';
+const baseUrl = PUBLIC_APP_URL || (dev ? 'http://localhost:5173' : undefined);
 
 export const authConfig = {
   providers,
@@ -110,11 +110,11 @@ export const authConfig = {
         httpOnly: true,
         sameSite: 'lax' as const,
         path: '/',
-        secure: !dev && baseUrl.startsWith('https'),
+        secure: !dev && (baseUrl ? baseUrl.startsWith('https') : true),
       }
     }
   },
-  useSecureCookies: !dev && baseUrl.startsWith('https'),
+  useSecureCookies: !dev && (baseUrl ? baseUrl.startsWith('https') : true),
   jwt: {
     maxAge: 24 * 60 * 60,
   },
@@ -159,8 +159,8 @@ export const authConfig = {
 
 console.log('🔐 AUTH CONFIGURATION LOADED');
 console.log(`Providers: ${providers.map(p => (p as any).id || (p as any).name).join(', ')}`);
-console.log(`Base URL: ${baseUrl}`);
-console.log(`Secure cookies: ${!dev && baseUrl.startsWith('https')}`);
+console.log(`Base URL: ${baseUrl || 'auto-detected'}`);
+console.log(`Secure cookies: ${!dev && (baseUrl ? baseUrl.startsWith('https') : true)}`);
 console.log(`Debug mode: ${dev}`);
 
 console.log('✅ Multiple auth methods available');

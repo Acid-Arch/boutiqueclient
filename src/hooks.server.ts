@@ -2,7 +2,7 @@ import type { Handle, HandleServerError } from '@sveltejs/kit';
 import { redirect } from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
 import { dev } from '$app/environment';
-import { authHandle } from './auth-production.js';
+import { authHandle } from './auth.js';
 import { AuthService } from '$lib/server/auth-direct.ts';
 import type { SessionUser } from '$lib/server/auth-direct.ts';
 import { userCan, checkRoutePermission } from '$lib/permissions.ts';
@@ -11,7 +11,7 @@ import { requestLoggingHandle } from '$lib/server/logging/request-logger.js';
 import { errorHandler } from '$lib/server/error-handler.js';
 import { logger, LogLevel } from '$lib/server/logging/logger.js';
 import { rateLimitMiddleware } from '$lib/server/rate-limiter-comprehensive.js';
-import { securityMiddleware } from '$lib/server/security-headers.js';
+import { securityMiddleware } from '$lib/server/security-headers-disabled.js';
 
 // Declare locals type
 declare global {

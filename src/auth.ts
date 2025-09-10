@@ -1,259 +1,168 @@
 import { SvelteKitAuth } from '@auth/sveltekit';
+import GoogleProvider from '@auth/core/providers/google';
+import CredentialsProvider from '@auth/core/providers/credentials';
 import type { Provider } from '@auth/core/providers';
 import { dev } from '$app/environment';
-import { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET } from '$env/static/private';
+import { AuthService } from '$lib/server/auth-direct.js';
+import { 
+  GOOGLE_CLIENT_ID, 
+  GOOGLE_CLIENT_SECRET, 
+  AUTH_SECRET
+} from '$env/static/private';
+import { PUBLIC_APP_URL } from '$env/static/public';
 
-// Temporary authentication setup for IP-only deployment
-// This bypasses OAuth for testing on Hetzner server
-// To be replaced with full OAuth when domain is configured
+console.log('🔧 Initializing unified auth with:', {
+  hasGoogleClientId: !!GOOGLE_CLIENT_ID && GOOGLE_CLIENT_ID !== 'disabled-for-ip-deployment',
+  hasGoogleSecret: !!GOOGLE_CLIENT_SECRET && GOOGLE_CLIENT_SECRET !== 'disabled-for-ip-deployment',
+  hasAuthSecret: !!AUTH_SECRET,
+  appUrl: PUBLIC_APP_URL || 'http://silentsignal.io'
+});
 
-export const { handle: authHandle, signIn, signOut } = SvelteKitAuth({
-  providers: [
-    // Credentials provider for temporary access during IP-only deployment
-    {
-      id: 'test-admin',
-      name: 'Test Admin Access',
-      type: 'credentials',
-      credentials: {
-        username: { 
-          label: 'Username', 
-          type: 'text', 
-          placeholder: 'Enter admin username' 
-        },
-        password: { 
-          label: 'Password', 
-          type: 'password' 
+const providers: Provider[] = [];
+
+// Add Google OAuth if credentials are configured
+if (GOOGLE_CLIENT_ID && 
+    GOOGLE_CLIENT_SECRET && 
+    GOOGLE_CLIENT_ID !== 'disabled-for-ip-deployment' && 
+    GOOGLE_CLIENT_SECRET !== 'disabled-for-ip-deployment') {
+  
+  console.log('✅ Adding Google OAuth provider');
+  providers.push(
+    GoogleProvider({
+      clientId: GOOGLE_CLIENT_ID,
+      clientSecret: GOOGLE_CLIENT_SECRET,
+      authorization: {
+        params: {
+          access_type: "offline",
+          prompt: "select_account",
+          scope: "openid email profile"
         }
+      }
+    })
+  );
+} else {
+  console.log('⚠️ Google OAuth disabled - missing or disabled credentials');
+}
+
+// Add credentials provider as fallback
+providers.push(
+  CredentialsProvider({
+    id: 'credentials',
+    name: 'Email and Password',
+    credentials: {
+      email: { 
+        label: 'Email', 
+        type: 'email', 
+        placeholder: 'Enter your email' 
       },
-      async authorize(credentials) {
-        // TEMPORARY: Simple hardcoded credentials for testing
-        // In production with domain, this should be removed
-        if (
-          credentials?.username === 'admin' && 
-          credentials?.password === 'boutique2024!'
-        ) {
+      password: { 
+        label: 'Password', 
+        type: 'password' 
+      }
+    },
+    async authorize(credentials) {
+      if (!credentials?.email || !credentials?.password) {
+        console.log('❌ Missing email or password in credentials');
+        return null;
+      }
+
+      try {
+        const result = await AuthService.authenticateUser(
+          credentials.email as string, 
+          credentials.password as string
+        );
+
+        if (result.success && result.user) {
+          console.log('✅ Database authentication successful for:', credentials.email);
           return {
-            id: 'test-admin-001',
-            email: 'admin@boutique.local',
-            name: 'Test Admin',
-            role: 'ADMIN',
-            accountLinked: true,
-            isNewUser: false
+            id: result.user.id,
+            email: result.user.email,
+            name: result.user.name,
+            role: result.user.role,
+            isNewUser: false,
+            accountLinked: true
           };
+        } else {
+          console.log('❌ Database authentication failed for:', credentials.email, 'Error:', result.error);
+          return null;
         }
-        
-        // Check for test client user
-        if (
-          credentials?.username === 'client' && 
-          credentials?.password === 'client2024!'
-        ) {
-          return {
-            id: 'test-client-001',
-            email: 'client@boutique.local',
-            name: 'Test Client',
-            role: 'CLIENT',
-            accountLinked: true,
-            isNewUser: false
-          };
-        }
-        
+      } catch (error) {
+        console.error('❌ Credentials authorization error:', error);
         return null;
       }
     }
-  ] as Provider[],
-  
-  // Session configuration
+  })
+);
+
+const baseUrl = PUBLIC_APP_URL || 'http://silentsignal.io';
+
+export const authConfig = {
+  providers,
   session: {
-    strategy: 'jwt',
-    maxAge: 24 * 60 * 60, // 24 hours for testing
-    updateAge: 6 * 60 * 60, // Update every 6 hours
+    strategy: 'jwt' as const,
+    maxAge: 24 * 60 * 60,
+    updateAge: 6 * 60 * 60,
   },
-  
-  // Cookies configuration
   cookies: {
     sessionToken: {
       name: 'boutique-session-token',
       options: {
         httpOnly: true,
-        sameSite: 'lax',
+        sameSite: 'lax' as const,
         path: '/',
-        secure: false, // HTTP-only for IP deployment
-        domain: undefined // No domain for IP-based access
-      }
-    },
-    callbackUrl: {
-      name: 'boutique-callback-url',
-      options: {
-        httpOnly: true,
-        sameSite: 'lax',
-        path: '/',
-        secure: false
-      }
-    },
-    csrfToken: {
-      name: 'boutique-csrf-token',
-      options: {
-        httpOnly: true,
-        sameSite: 'lax',
-        path: '/',
-        secure: false
+        secure: !dev && baseUrl.startsWith('https'),
       }
     }
   },
-  
-  // No secure cookies for HTTP deployment
-  useSecureCookies: false,
-  
-  // JWT configuration
+  useSecureCookies: !dev && baseUrl.startsWith('https'),
   jwt: {
-    maxAge: 24 * 60 * 60, // 24 hours
+    maxAge: 24 * 60 * 60,
   },
-  
-  // Page configuration
   pages: {
     signIn: '/login',
     error: '/login',
     signOut: '/login'
   },
-  
-  // Simplified callbacks for IP-only deployment
+  secret: AUTH_SECRET,
+  trustHost: true,
   callbacks: {
-    async signIn({ user, account }) {
-      // Allow all credential-based sign-ins for testing
-      if (account?.provider === 'test-admin') {
-        console.log(`IP-only test login: ${user.email}`);
-        return true;
-      }
-      return false;
+    async signIn({ user, account, profile }) {
+      console.log('🔐 Sign in attempt:', {
+        provider: account?.provider,
+        userEmail: user.email,
+        hasProfile: !!profile
+      });
+      return true;
     },
-    
-    async jwt({ token, user, account }) {
-      // Handle initial sign in for test users
-      if (account && user) {
-        token.userId = user.id;
-        token.email = user.email;
-        token.name = user.name;
-        token.role = user.role;
-        token.isNewUser = user.isNewUser || false;
-        token.accountLinked = user.accountLinked || true;
-        
-        console.log(`JWT created for test user: ${user.email}`);
+    async jwt({ token, user, account, profile, trigger }) {
+      if (trigger === 'signIn' && user && account) {
+        console.log('🎫 JWT creation for user:', user.email);
+        token.role = (user as any).role || 'VIEWER';
+        token.provider = account.provider;
+        token.isNewUser = (user as any).isNewUser || false;
+        token.accountLinked = (user as any).accountLinked || false;
       }
-      
       return token;
     },
-    
     async session({ session, token }) {
-      // Add custom user data to session
-      if (token.userId) {
-        session.user.id = token.userId as string;
+      if (token) {
+        session.user.id = token.sub || '';
         session.user.role = token.role as string;
+        session.user.provider = token.provider as string;
         session.user.isNewUser = token.isNewUser as boolean;
         session.user.accountLinked = token.accountLinked as boolean;
       }
-      
       return session;
-    },
-    
-    async redirect({ url, baseUrl }) {
-      // Handle redirects for IP-based deployment
-      if (url.startsWith('/')) {
-        return `${baseUrl}${url}`;
-      }
-      
-      const returnUrl = new URL(url).searchParams.get('redirectTo') || 
-                       new URL(url).searchParams.get('callbackUrl');
-      
-      if (returnUrl && returnUrl.startsWith('/')) {
-        return `${baseUrl}${returnUrl}`;
-      }
-      
-      // Default redirect to client portal
-      return `${baseUrl}/client-portal`;
     }
-  },
-  
-  // Events for logging
-  events: {
-    async signIn({ user, account }) {
-      console.log(`IP-only deployment sign in: ${user.email} (provider: ${account?.provider})`);
-    }
-  },
-  
-  // Enable debug for IP testing
-  debug: true,
-  
-  // Trust host for IP-based deployment
-  trustHost: true,
-  
-  // Secret for JWT signing
-  secret: (() => {
-    const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
-    
-    if (!secret) {
-      console.warn('⚠️  WARNING: Using fallback secret for IP-only deployment testing');
-      return 'ip-only-deployment-test-secret-not-for-production-use-2024-boutique-testing';
-    }
-    
-    return secret;
-  })()
-});
-
-// Export test credentials for documentation
-export const TEST_CREDENTIALS = {
-  admin: {
-    username: 'admin',
-    password: 'boutique2024!',
-    role: 'ADMIN'
-  },
-  client: {
-    username: 'client',
-    password: 'client2024!',
-    role: 'CLIENT'
   }
 };
 
-// Warning message for production
-console.log(`
-⚠️  IP-ONLY DEPLOYMENT AUTH ACTIVE ⚠️
-Test credentials:
-- Admin: admin / boutique2024!
-- Client: client / client2024!
+console.log('🔐 AUTH CONFIGURATION LOADED');
+console.log(`Providers: ${providers.map(p => (p as any).id || (p as any).name).join(', ')}`);
+console.log(`Base URL: ${baseUrl}`);
+console.log(`Secure cookies: ${!dev && baseUrl.startsWith('https')}`);
+console.log(`Debug mode: ${dev}`);
 
-This is TEMPORARY for IP-only testing.
-Replace with full OAuth when domain is configured.
-`);
+console.log('✅ Multiple auth methods available');
 
-// Export custom types for TypeScript (same as main auth.ts)
-declare module '@auth/core/types' {
-  interface Session {
-    user: {
-      id: string;
-      email: string;
-      name: string;
-      image?: string;
-      role: string;
-      isNewUser: boolean;
-      accountLinked: boolean;
-    };
-  }
-  
-  interface User {
-    id: string;
-    email: string;
-    name: string;
-    image?: string;
-    role: string;
-    isNewUser?: boolean;
-    accountLinked?: boolean;
-  }
-  
-  interface JWT {
-    userId: string;
-    email: string;
-    name: string;
-    role: string;
-    isNewUser: boolean;
-    accountLinked: boolean;
-  }
-}
+export const { handle: authHandle, signIn, signOut } = SvelteKitAuth(authConfig);

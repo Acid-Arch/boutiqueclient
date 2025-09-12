@@ -29,7 +29,9 @@
 
 	async function handleGoogleSignIn() {
 		try {
-			await signIn('google', { callbackUrl: '/client-portal' });
+			// Use custom OAuth flow instead of Auth.js
+			const returnUrl = encodeURIComponent('/client-portal');
+			window.location.href = `/api/google-oauth?action=initiate&returnUrl=${returnUrl}`;
 		} catch (error) {
 			console.error('OAuth signin error:', error);
 			loginError = 'OAuth signin failed. Please try again.';

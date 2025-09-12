@@ -2,11 +2,10 @@ import { json, error, redirect } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { dev } from '$app/environment';
 import { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET } from '$env/static/private';
-import { OAuthService, type GoogleProfile } from '$lib/server/oauth-service.js';
 
 /**
- * OAuth Google Authentication API
- * Provides OAuth initiation and callback handling
+ * Simplified OAuth Google Authentication API
+ * Compatible with existing authentication system
  */
 
 // OAuth initiation endpoint
@@ -69,7 +68,7 @@ async function handleOAuthInitiation(url: URL, cookies: any) {
   });
   
   // Build Google OAuth URL
-  const baseUrl = dev ? 'http://localhost:5173' : 'https://your-domain.com';
+  const baseUrl = dev ? 'http://localhost:5173' : 'http://silentsignal.io';
   const redirectUri = `${baseUrl}/api/auth/oauth/google?action=callback`;
   
   const googleAuthUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
@@ -120,52 +119,52 @@ async function handleOAuthCallback(url: URL, cookies: any) {
   }
   
   try {
+    console.log('OAuth callback: Starting token exchange for code:', code?.substring(0, 10) + '...');
+    
     // Exchange authorization code for tokens
     const tokenResponse = await exchangeCodeForTokens(code);
+    console.log('OAuth callback: Token exchange successful, access_token received');
     
     // Get user profile from Google
     const userProfile = await getGoogleUserProfile(tokenResponse.access_token);
+    console.log('OAuth callback: User profile received:', { email: userProfile.email, name: userProfile.name });
     
-    // Validate profile structure
-    if (!OAuthService.validateGoogleProfile(userProfile)) {
-      throw new Error('Invalid Google profile structure');
-    }
+    // Create simple session compatible with hooks.server.ts
+    const sessionData = {
+      id: `google_oauth_${Date.now()}`,
+      email: userProfile.email,
+      name: userProfile.name || userProfile.email,
+      picture: userProfile.picture || null,
+      provider: "google",
+      role: "CLIENT",
+      isActive: true,
+      loginTime: Date.now(),
+      verified_email: userProfile.email_verified || true,
+      authCode: code.substring(0, 10) + "..."
+    };
     
-    // Handle user authentication through OAuthService
-    const oauthResult = await OAuthService.handleGoogleCallback(userProfile);
+    console.log('OAuth callback: Creating session for user:', sessionData.email);
     
-    if (!oauthResult.success) {
-      console.error('OAuth user handling failed:', oauthResult.error);
-      throw redirect(302, `/login?error=oauth_user_error&message=${encodeURIComponent(oauthResult.error || 'Authentication failed')}`);
-    }
+    // Set session cookie that hooks.server.ts can read
+    cookies.set('user_session', JSON.stringify(sessionData), {
+      path: '/',
+      httpOnly: true,
+      secure: !dev,
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 // 7 days
+    });
     
-    if (!oauthResult.user) {
-      throw new Error('No user returned from OAuth handling');
-    }
-    
-    // Create session using OAuthService
-    const sessionData = await OAuthService.createOAuthSession(oauthResult.user, new Request(url.toString()));
-    
-    // Set session cookie
-    cookies.set('session', `${oauthResult.user.id}:${sessionData.token}`, sessionData.cookieOptions);
-    
-    // Build success redirect URL with context
-    const successUrl = new URL(returnUrl, url.origin);
-    if (oauthResult.isNewUser) {
-      successUrl.searchParams.set('welcome', 'true');
-    }
-    if (oauthResult.accountLinked) {
-      successUrl.searchParams.set('linked', 'true');
-    }
+    console.log('OAuth callback: Session created successfully, redirecting to:', returnUrl);
     
     // Redirect to success page
-    throw redirect(302, successUrl.toString());
+    throw redirect(302, returnUrl);
     
   } catch (err) {
     console.error('OAuth callback processing error:', err);
+    console.error('Error stack:', err instanceof Error ? err.stack : 'No stack trace');
     
-    const errorMessage = err instanceof Error ? err.message : 'Authentication failed';
-    throw redirect(302, `/login?error=oauth_callback_error&message=${encodeURIComponent(errorMessage)}`);
+    const errorMessage = err instanceof Error ? err.message : 'Session creation failed';
+    throw redirect(302, `/login?error=oauth_error&message=${encodeURIComponent(errorMessage)}`);
   }
 }
 
@@ -189,7 +188,7 @@ async function handleOAuthStatus() {
  * Exchange authorization code for tokens
  */
 async function exchangeCodeForTokens(code: string): Promise<{access_token: string, id_token: string}> {
-  const baseUrl = dev ? 'http://localhost:5173' : 'https://your-domain.com';
+  const baseUrl = dev ? 'http://localhost:5173' : 'http://silentsignal.io';
   const redirectUri = `${baseUrl}/api/auth/oauth/google?action=callback`;
   
   const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
@@ -224,7 +223,7 @@ async function exchangeCodeForTokens(code: string): Promise<{access_token: strin
 /**
  * Get user profile from Google
  */
-async function getGoogleUserProfile(accessToken: string): Promise<GoogleProfile> {
+async function getGoogleUserProfile(accessToken: string): Promise<any> {
   const profileResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
     headers: {
       'Authorization': `Bearer ${accessToken}`
@@ -244,7 +243,7 @@ async function getGoogleUserProfile(accessToken: string): Promise<GoogleProfile>
     throw new Error('Incomplete profile data from Google');
   }
   
-  return profile as GoogleProfile;
+  return profile;
 }
 
 /**

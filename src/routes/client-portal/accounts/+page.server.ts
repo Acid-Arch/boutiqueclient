@@ -61,7 +61,7 @@ async function getUserAccountsWithModelAccess(user: any) {
 			where: {
 				OR: [
 					{ ownerId: parseInt(user.id) },
-					...(user.email.includes('@gmail.com') ? [{ model: 'Dillion' }] : [])
+					...(user.model ? [{ model: user.model }] : [])
 				]
 			},
 			orderBy: {
@@ -89,20 +89,10 @@ async function getUserAccountsDirectSQL(user: any) {
 		let modelFilter = '';
 		const queryParams = [user.id];
 		
-		// Add model-based access for Gmail users
-		if (user.email && user.email.includes('@gmail.com')) {
-			modelFilter = `OR (model = 'Dillion' AND (account_type != 'ML_TREND_FINDER' OR account_type IS NULL))`;
-			console.log(`🔑 Accounts SQL: Adding Dillion model access for Gmail user: ${user.email}`);
-		}
-		
-		// Add model-based access for Hotmail/Live/Outlook users
-		if (user.email && (
-			user.email.includes('@hotmail.') || 
-			user.email.includes('@live.') || 
-			user.email.includes('@outlook.')
-		)) {
-			modelFilter = `OR (model = 'katie' AND (account_type != 'ML_TREND_FINDER' OR account_type IS NULL))`;
-			console.log(`🔑 Accounts SQL: Adding katie model access for Hotmail user: ${user.email}`);
+		// Add model-based access from database assignment
+		if (user.model) {
+			modelFilter = `OR (model = '${user.model}' AND (account_type != 'ML_TREND_FINDER' OR account_type IS NULL))`;
+			console.log(`🔑 Accounts SQL: Adding ${user.model} model access for user: ${user.email}`);
 		}
 		
 		const accountsQuery = `

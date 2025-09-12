@@ -79,6 +79,7 @@ providers.push(
             email: result.user.email,
             name: result.user.name,
             role: result.user.role,
+            model: result.user.model,
             isNewUser: false,
             accountLinked: true
           };
@@ -136,11 +137,41 @@ export const authConfig = {
     },
     async jwt({ token, user, account, profile, trigger }) {
       if (trigger === 'signIn' && user && account) {
-        console.log('🎫 JWT creation for user:', user.email);
-        token.role = (user as any).role || 'VIEWER';
+        console.log('🎫 JWT creation for user:', user.email, 'provider:', account.provider);
+        
+        // For Google OAuth, we need to fetch user data from database
+        if (account.provider === 'google') {
+          try {
+            const dbUser = await AuthService.getUserByEmail(user.email);
+            if (dbUser) {
+              console.log('📊 Google OAuth: Found user in database with model:', dbUser.model);
+              token.role = dbUser.role || 'VIEWER';
+              token.model = dbUser.model || null;
+              token.isNewUser = false;
+              token.accountLinked = true;
+            } else {
+              console.log('⚠️ Google OAuth: User not found in database:', user.email);
+              token.role = 'VIEWER';
+              token.model = null;
+              token.isNewUser = true;
+              token.accountLinked = false;
+            }
+          } catch (error) {
+            console.error('❌ Error fetching user data during OAuth:', error);
+            token.role = 'VIEWER';
+            token.model = null;
+            token.isNewUser = true;
+            token.accountLinked = false;
+          }
+        } else {
+          // For credentials login, use the user object directly
+          token.role = (user as any).role || 'VIEWER';
+          token.model = (user as any).model || null;
+          token.isNewUser = (user as any).isNewUser || false;
+          token.accountLinked = (user as any).accountLinked || false;
+        }
+        
         token.provider = account.provider;
-        token.isNewUser = (user as any).isNewUser || false;
-        token.accountLinked = (user as any).accountLinked || false;
       }
       return token;
     },
@@ -148,6 +179,7 @@ export const authConfig = {
       if (token) {
         session.user.id = token.sub || '';
         session.user.role = token.role as string;
+        session.user.model = token.model as string;
         session.user.provider = token.provider as string;
         session.user.isNewUser = token.isNewUser as boolean;
         session.user.accountLinked = token.accountLinked as boolean;

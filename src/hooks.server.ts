@@ -28,7 +28,7 @@ declare global {
 const ADMIN_ONLY_ROUTES = ['/accounts', '/devices', '/scraping', '/settings'];
 const CLIENT_PORTAL_ROUTES = ['/client-portal'];
 const UNAUTHORIZED_ROUTES = ['/access-pending'];
-const AUTH_ROUTES = ['/login', '/register', '/forgot-password', '/reset-password', '/api/auth', '/api/test-login'];
+const AUTH_ROUTES = ['/login', '/register', '/forgot-password', '/reset-password', '/api/auth', '/api/test-login', '/api/google-oauth'];
 const PUBLIC_ROUTES = ['/unauthorized'];
 
 
@@ -68,6 +68,7 @@ const authSessionHandle: Handle = async ({ event, resolve }) => {
 					company: authSession.user.company || null,
 					avatar: authSession.user.image || null,
 					subscription: authSession.user.subscription || 'Basic',
+					model: authSession.user.model || null,
 					lastLoginAt: new Date()
 				};
 				

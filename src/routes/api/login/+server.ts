@@ -3,7 +3,7 @@ import type { RequestHandler } from './$types';
 import { validateIPAccess, recordFailedAttempt } from '$lib/server/ip-whitelist.ts';
 import { validateAPIRequest } from '$lib/server/validation/middleware.js';
 import { LoginSchema } from '$lib/server/validation/schemas.js';
-import { signIn } from '../../../auth-production.ts';
+import { signIn } from '../../../auth.ts';
 
 export const POST: RequestHandler = async (event) => {
 	console.log('🔐 Login API endpoint called');

@@ -77,7 +77,7 @@ class PostgresDirectClient {
     async findUserByEmail(email: string): Promise<any | null> {
         try {
             const result = await this.query(
-                'SELECT id, email, name, password_hash, role, active, email_verified FROM users WHERE email = $1',
+                'SELECT id, email, name, password_hash, role, active, email_verified, model, company, avatar, subscription, last_login_at FROM users WHERE email = $1',
                 [email]
             );
             return result.rows[0] || null;
@@ -90,7 +90,7 @@ class PostgresDirectClient {
     async findUserById(id: number): Promise<any | null> {
         try {
             const result = await this.query(
-                'SELECT id, email, name, role, active, email_verified FROM users WHERE id = $1',
+                'SELECT id, email, name, role, active, email_verified, model, company, avatar, subscription, last_login_at FROM users WHERE id = $1',
                 [id]
             );
             return result.rows[0] || null;

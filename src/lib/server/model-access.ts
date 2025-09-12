@@ -2,8 +2,7 @@
  * Model Access Management
  * 
  * This module handles the relationship between users and Instagram account models.
- * - Gmail users get access to accounts assigned to the "Dillion" model
- * - Hotmail/Live/Outlook users get access to accounts assigned to the "katie" model
+ * Users are assigned specific models in the database and get access to accounts with those models.
  */
 
 export interface UserModelAccess {
@@ -13,28 +12,19 @@ export interface UserModelAccess {
 }
 
 /**
- * Determines which models a user has access to based on their email and role
+ * Determines which models a user has access to based on their database model assignment and role
  */
-export function getUserModelAccess(user: { id: string; email: string; role: string }): string[] {
+export function getUserModelAccess(user: { id: string; email: string; role: string; model?: string }): string[] {
   const assignedModels: string[] = [];
   
-  // Gmail users get access to Dillion model accounts
-  if (user.email && user.email.includes('@gmail.com')) {
-    assignedModels.push('Dillion');
-  }
-  
-  // Hotmail/Live/Outlook users get access to katie model accounts
-  if (user.email && (
-    user.email.includes('@hotmail.') || 
-    user.email.includes('@live.') || 
-    user.email.includes('@outlook.')
-  )) {
-    assignedModels.push('katie');
+  // Use the user's assigned model from database
+  if (user.model) {
+    assignedModels.push(user.model);
   }
   
   // Admin users get access to all models
   if (user.role === 'ADMIN') {
-    assignedModels.push('Dillion', 'katie', 'Premium', 'Basic'); // Add other models as needed
+    assignedModels.push('Dillion', 'katie', 'Premium', 'Basic');
   }
   
   return assignedModels;
@@ -43,7 +33,7 @@ export function getUserModelAccess(user: { id: string; email: string; role: stri
 /**
  * Checks if a user has access to a specific model
  */
-export function userCanAccessModel(user: { id: string; email: string; role: string }, model: string): boolean {
+export function userCanAccessModel(user: { id: string; email: string; role: string; model?: string }, model: string): boolean {
   const userModels = getUserModelAccess(user);
   return userModels.includes(model);
 }
@@ -51,7 +41,7 @@ export function userCanAccessModel(user: { id: string; email: string; role: stri
 /**
  * Gets the database query filter for Instagram accounts based on user's model access
  */
-export function getAccountsFilterForUser(user: { id: string; email: string; role: string }) {
+export function getAccountsFilterForUser(user: { id: string; email: string; role: string; model?: string }) {
   const userModels = getUserModelAccess(user);
   const userId = parseInt(user.id) || null;
   
@@ -72,7 +62,7 @@ export function getAccountsFilterForUser(user: { id: string; email: string; role
 /**
  * Debug function to log user's model access
  */
-export function logUserModelAccess(user: { id: string; email: string; role: string }) {
+export function logUserModelAccess(user: { id: string; email: string; role: string; model?: string }) {
   const models = getUserModelAccess(user);
   console.log(`🔑 User ${user.email} has access to models: [${models.join(', ')}]`);
   return models;

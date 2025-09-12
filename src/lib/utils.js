@@ -4,3 +4,9 @@ export { cn } from './utils/cn.js';
 export function withElementRef(component) {
 	return component;
 }
+
+// TypeScript type exports for shadcn components
+export const WithElementRef = undefined;
+export const WithoutChildren = undefined;
+export const WithoutChildrenOrChild = undefined;
+export const WithoutChild = undefined;

@@ -14,6 +14,7 @@ export interface SessionUser {
   role: string;
   subscription: string;
   isActive: boolean;
+  model?: string | null;
   lastLoginAt?: Date | null;
 }
 
@@ -133,6 +134,7 @@ export class AuthService {
         role: user.role,
         subscription: user.subscription || 'Basic',
         isActive: user.active,
+        model: user.model,
         lastLoginAt: user.last_login_at
       };
 
@@ -180,11 +182,42 @@ export class AuthService {
         role: user.role,
         subscription: user.subscription || 'Basic',
         isActive: user.active,
+        model: user.model,
         lastLoginAt: user.last_login_at
       };
 
     } catch (error) {
       console.error('Get user by ID error:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Find user by email using direct PostgreSQL client
+   */
+  static async getUserByEmail(email: string): Promise<SessionUser | null> {
+    try {
+      const user = await pgDirect.findUserByEmail(email);
+      
+      if (!user) {
+        return null;
+      }
+
+      return {
+        id: user.id.toString(),
+        email: user.email,
+        name: user.name || 'User',
+        company: user.company,
+        avatar: user.avatar,
+        role: user.role,
+        subscription: user.subscription || 'Basic',
+        isActive: user.active,
+        model: user.model,
+        lastLoginAt: user.last_login_at
+      };
+
+    } catch (error) {
+      console.error('Get user by email error:', error);
       return null;
     }
   }

@@ -5,9 +5,10 @@ on:
     branches: [ main, develop ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:  # Allow manual triggers
 
 env:
-  NODE_VERSION: '18'
+  NODE_VERSION: '20'  # Upgraded to Node.js 20 LTS
 
 jobs:
   # Security and Quality Checks
@@ -70,12 +71,12 @@ jobs:
         run: npm ci
 
       - name: Generate Prisma client
-        run: npx prisma generate
+        run: PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1 npx prisma generate
         env:
           DATABASE_URL: postgresql://postgres:testpass@localhost:5432/test_db
 
       - name: Run database migrations
-        run: npx prisma db push --force-reset
+        run: PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1 npx prisma db push --force-reset
         env:
           DATABASE_URL: postgresql://postgres:testpass@localhost:5432/test_db
 
@@ -123,10 +124,10 @@ jobs:
         run: npm ci
 
       - name: Generate Prisma client
-        run: npx prisma generate
+        run: PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1 npx prisma generate
 
       - name: Build application
-        run: npm run build
+        run: NODE_ENV=production npm run build
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v3
@@ -235,7 +236,7 @@ jobs:
           path: playwright-report/
           retention-days: 7
 
-  # Production Deployment (when ready)
+  # Production Deployment
   deploy:
     name: Deploy to Production
     runs-on: ubuntu-latest
@@ -244,20 +245,85 @@ jobs:
     environment: production
 
     steps:
-      - name: Deploy notification
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Setup SSH key
         run: |
-          echo "🚀 Ready for production deployment"
-          echo "Deployment package: boutique-client-${{ github.sha }}.tar.gz"
-          echo "Use scripts/deploy-production.sh for server deployment"
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/github-actions-boutique
+          chmod 600 ~/.ssh/github-actions-boutique
+          ssh-keyscan -H ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts
 
       - name: Download deployment package
         uses: actions/download-artifact@v3
         with:
           name: deployment-package
 
-      # Uncomment and customize for your deployment strategy:
-      # - name: Deploy to production server
-      #   run: |
-      #     # Transfer package to production server
-      #     # scp boutique-client-${{ github.sha }}.tar.gz user@server:/opt/boutique-client/
-      #     # ssh user@server 'cd /opt/boutique-client && ./scripts/deploy-production.sh boutique-client-${{ github.sha }}.tar.gz'
+      - name: Rename deployment package
+        run: mv boutique-client-${{ github.sha }}.tar.gz boutique-client-${{ github.sha }}.tar.gz
+
+      - name: Deploy to production server
+        env:
+          SERVER_IP: ${{ secrets.SERVER_IP }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          SERVICE_USER: ${{ secrets.SERVICE_USER }}
+          SUDO_PASSWORD: ${{ secrets.SUDO_PASSWORD }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          chmod +x scripts/github-actions-deploy.sh
+          ./scripts/github-actions-deploy.sh deploy
+
+      - name: Post-deployment notification
+        if: success()
+        run: |
+          echo "🎉 Deployment successful!"
+          echo "Application URL: http://${{ secrets.SERVER_IP }}:3000"
+          echo "WebSocket URL: http://${{ secrets.SERVER_IP }}:8081"
+          echo "Deployment ID: ${{ github.sha }}"
+
+      - name: Deployment failure notification
+        if: failure()
+        run: |
+          echo "❌ Deployment failed!"
+          echo "Check the logs above for details"
+          echo "Consider running a rollback if needed"
+
+  # Rollback job (manual trigger)
+  rollback:
+    name: Rollback Production
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/github-actions-boutique
+          chmod 600 ~/.ssh/github-actions-boutique
+          ssh-keyscan -H ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts
+
+      - name: Rollback production deployment
+        env:
+          SERVER_IP: ${{ secrets.SERVER_IP }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          SERVICE_USER: ${{ secrets.SERVICE_USER }}
+          SUDO_PASSWORD: ${{ secrets.SUDO_PASSWORD }}
+        run: |
+          chmod +x scripts/github-actions-deploy.sh
+          ./scripts/github-actions-deploy.sh rollback
+
+      - name: Rollback notification
+        run: |
+          echo "🔄 Rollback completed"
+          echo "Application URL: http://${{ secrets.SERVER_IP }}:3000"

@@ -83,8 +83,49 @@ pre_deployment_checks() {
     
     # Check if required directories exist - use server-side script to avoid multiple sudo calls
     info "Ensuring directory structure..."
-    copy_to_server "scripts/server-deploy.sh" "/tmp/server-deploy.sh" "$SERVER_USER"
+    
+    # Verify server-deploy.sh exists and copy it
+    local server_deploy_script="scripts/server-deploy.sh"
+    if [ ! -f "$server_deploy_script" ]; then
+        server_deploy_script="./scripts/server-deploy.sh"
+        if [ ! -f "$server_deploy_script" ]; then
+            # Create the script inline if it doesn't exist
+            cat > /tmp/server-deploy-temp.sh << 'EOF'
+#!/bin/bash
+# Server-side deployment script that handles all sudo operations
+set -e
+
+# Configuration
+SERVICE_USER="boutique-client"
+APP_DIR="/opt/boutique-client"
+LOG_DIR="$APP_DIR/logs"
+BACKUP_DIR="$APP_DIR/backups"
+
+echo "🚀 Starting server-side deployment..."
+
+# Create directories with sudo
+echo "📁 Setting up directories..."
+sudo mkdir -p $APP_DIR $LOG_DIR $BACKUP_DIR
+sudo chown -R $SERVICE_USER:users $APP_DIR
+
+# Clean up any old deployment
+echo "🧹 Cleaning up previous deployment..."
+sudo rm -rf $APP_DIR/app-new || true
+sudo mkdir -p $APP_DIR/app-new
+sudo chown $SERVICE_USER:users $APP_DIR/app-new
+
+echo "✅ Server-side setup completed!"
+echo "Ready for application deployment as $SERVICE_USER user."
+EOF
+            server_deploy_script="/tmp/server-deploy-temp.sh"
+        fi
+    fi
+    
+    info "Copying server deployment script: $server_deploy_script"
+    copy_to_server "$server_deploy_script" "/tmp/server-deploy.sh" "$SERVER_USER"
     run_remote "$SERVER_USER" "chmod +x /tmp/server-deploy.sh"
+    
+    info "Running server-side deployment setup with sudo..."
     echo "$SUDO_PASSWORD" | timeout 30 ssh -i ~/.ssh/github-actions-boutique -o StrictHostKeyChecking=no -o ServerAliveInterval=10 "$SERVER_USER@$SERVER_IP" "sudo -S /tmp/server-deploy.sh"
     
     log "✅ Pre-deployment checks completed"

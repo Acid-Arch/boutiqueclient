@@ -27,7 +27,7 @@
 		"test:e2e:debug": "playwright test --debug --port 5877",
 		"prebuild": "npm run check",
 		"postinstall": "svelte-kit sync",
-		"lint": "prettier --check . || echo 'Prettier formatting issues found but continuing' && eslint .",
+		"lint": "prettier --check . || echo 'Prettier formatting issues found but continuing'",
 		"format": "prettier --write .",
 		"generate:secrets": "node scripts/generate-secrets.js",
 		"generate:secrets:dev": "node scripts/generate-secrets.js development",

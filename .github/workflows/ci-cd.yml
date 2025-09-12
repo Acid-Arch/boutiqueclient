@@ -267,7 +267,7 @@ jobs:
       - name: Setup SSH key
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.DEPLOYMENT_SSH_KEY }}" > ~/.ssh/github-actions-boutique
+          echo "${{ secrets.DEPLOYMENT_SSH_KEY }}" | base64 -d > ~/.ssh/github-actions-boutique
           chmod 600 ~/.ssh/github-actions-boutique
           ssh-keyscan -H ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts
 
@@ -316,7 +316,7 @@ jobs:
       - name: Setup SSH key
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.DEPLOYMENT_SSH_KEY }}" > ~/.ssh/github-actions-boutique
+          echo "${{ secrets.DEPLOYMENT_SSH_KEY }}" | base64 -d > ~/.ssh/github-actions-boutique
           chmod 600 ~/.ssh/github-actions-boutique
           ssh-keyscan -H ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts
 

@@ -43,7 +43,7 @@ export function userCanAccessModel(user: { id: string; email: string; role: stri
  */
 export function getAccountsFilterForUser(user: { id: string; email: string; role: string; model?: string }) {
   const userModels = getUserModelAccess(user);
-  const userId = parseInt(user.id) || null;
+  const userId = user.id; // Keep as string since owner_id is text field
   
   // Return filter that includes:
   // 1. Accounts directly owned by the user (ownerId matches)

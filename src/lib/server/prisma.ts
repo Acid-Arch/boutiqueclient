@@ -15,7 +15,7 @@ export const prisma = {
   },
   
   // Health check method
-  async $queryRaw(query) {
+  async $queryRaw(query: any) {
     return await pgDirect.query(query);
   }
 };

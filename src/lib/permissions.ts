@@ -1,4 +1,5 @@
-import type { UserRole, AccountType, AccountVisibility } from '@prisma/client';
+import type { UserRole, AccountVisibility } from '$lib/types/prisma-types.js';
+import { AccountType } from '$lib/types/prisma-types.js';
 import type { SessionUser } from '$lib/server/auth-direct.js';
 
 // Helper function to safely convert user ID to number
@@ -286,7 +287,7 @@ export function getAccountsFilter(user: SessionUser | null): {
     includeAll: false,
     includeMLAccounts: false,
     ownerIdFilter: userId,
-    accountTypeFilter: ['CLIENT'] // No ML or SYSTEM accounts
+    accountTypeFilter: [AccountType.CLIENT] // No ML or SYSTEM accounts
   };
 }
 

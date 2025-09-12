@@ -802,7 +802,7 @@ async function getAccountsForUserDirectSQL(userId: number | string, userRole: 'A
 	const { Client } = pg.default;
 	
 	const client = new Client({
-		connectionString: process.env.DATABASE_URL || "postgresql://iglogin:boutiquepassword123@5.78.151.248:5432/igloginagent?sslmode=disable&connect_timeout=30"
+		connectionString: process.env.DATABASE_URL
 	});
 
 	try {

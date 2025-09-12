@@ -62,10 +62,6 @@ vi.mock('$lib/server/auth-direct', () => ({
 	}
 }));
 
-// Mock IP whitelist service
-vi.mock('$lib/server/ip-whitelist', () => ({
-	validateIPAccess: vi.fn(() => ({
-		allowed: true,
 		publicIP: '127.0.0.1',
 		reason: 'test'
 	})),

@@ -6,7 +6,7 @@
 	import { 
 		TrendingUp,
 		Instagram,
-		Play,
+		
 		Activity,
 		AlertCircle,
 		CheckCircle
@@ -47,12 +47,6 @@
 				<p class="text-slate-300">
 					Here's what's happening with your Instagram accounts today.
 				</p>
-			</div>
-			<div class="hidden md:block">
-				<Button class="bg-blue-600 hover:bg-blue-700 text-white">
-					<Play class="w-4 h-4 mr-2" />
-					Start Automation
-				</Button>
 			</div>
 		</div>
 	</div>

@@ -27,15 +27,15 @@
 		error = $page.url.searchParams.get('error') || $page.url.searchParams.get('reason') || '';
 	});
 
-	async function handleGoogleSignIn() {
+async function handleGoogleSignIn() {
 		try {
+			// Use Auth.js Google OAuth
 			await signIn('google', { callbackUrl: '/client-portal' });
 		} catch (error) {
-			console.error('OAuth signin error:', error);
+			console.error("OAuth signin error:", error);
 			loginError = 'OAuth signin failed. Please try again.';
 		}
 	}
-
 	function togglePasswordVisibility() {
 		showPassword = !showPassword;
 	}

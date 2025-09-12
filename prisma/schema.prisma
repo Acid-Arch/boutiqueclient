@@ -29,6 +29,8 @@ model IgAccount {
   accountType         AccountType         @default(CLIENT) // CLIENT, ML_TREND_FINDER, SYSTEM
   visibility          AccountVisibility   @default(PRIVATE) // PRIVATE, SHARED, PUBLIC
   isShared            Boolean             @default(false) @map("is_shared") // Whether account can be shared with other users
+n  // Model-based access field
+  model               String?             @map("model") @db.VarChar(50)
   
   // Relations
   owner               User?               @relation(fields: [ownerId], references: [id], onDelete: SetNull)

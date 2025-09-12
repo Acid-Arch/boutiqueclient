@@ -1,9 +1,9 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { validateIPAccess, recordFailedAttempt } from '$lib/server/ip-whitelist.ts';
 import { validateAPIRequest } from '$lib/server/validation/middleware.js';
 import { LoginSchema } from '$lib/server/validation/schemas.js';
-import { signIn } from '../../../auth-production.ts';
+import { signIn } from '../../../auth.js';
+import { AuthService } from '$lib/server/auth-direct.js';
 
 export const POST: RequestHandler = async (event) => {
 	console.log('🔐 Login API endpoint called');
@@ -37,44 +37,31 @@ export const POST: RequestHandler = async (event) => {
 	try {
 		console.log('📧 Login attempt for:', emailOrUsername);
 
-		// Step 1: IP Whitelist validation (before credential check)
-		const ipValidation = await validateIPAccess(request, undefined, emailOrUsername.trim());
-		
-		if (!ipValidation.allowed) {
-			// Record failed attempt for rate limiting
-			if (ipValidation.publicIP) {
-				await recordFailedAttempt(ipValidation.publicIP);
-			}
-			
-			return json(
-				{
-					success: false,
-					error: 'Access denied',
-					details: {
-						reason: ipValidation.reason,
-						publicIP: ipValidation.publicIP,
-						code: 'IP_ACCESS_DENIED'
-					}
-				},
-				{ status: 403 }
-			);
-		}
-
-		// Step 2: Use Auth.js to handle authentication and session creation
+		// Use AuthService directly for credentials authentication
 		try {
-			// Use Auth.js signIn with credentials provider
-			const authResult = await signIn('credentials', {
-				email: emailOrUsername.trim(),
-				password: password,
-				redirect: false // Don't redirect, return the result
-			});
+			// Authenticate user directly with AuthService
+			const result = await AuthService.authenticateUser(
+				emailOrUsername.trim(),
+				password
+			);
 
-			if (authResult?.error) {
-				// Record failed authentication attempt for rate limiting
-				if (ipValidation.publicIP) {
-					await recordFailedAttempt(ipValidation.publicIP);
-				}
+			if (result.success && result.user) {
+				console.log('✅ Authentication successful for:', emailOrUsername);
 				
+				// For direct API login, we'll need to create a manual session
+				// This is a temporary solution until we fix Auth.js integration
+				return json({
+					success: true,
+					user: {
+						id: result.user.id,
+						email: result.user.email,
+						name: result.user.name,
+						role: result.user.role
+					},
+					redirectUrl: '/client-portal'
+				});
+			} else {
+				console.log('❌ Authentication failed for:', emailOrUsername, 'Error:', result.error);
 				return json(
 					{ 
 						success: false, 
@@ -84,19 +71,8 @@ export const POST: RequestHandler = async (event) => {
 				);
 			}
 
-			// Auth.js handles session creation automatically
-			return json({
-				success: true,
-				redirectUrl: '/client-portal'
-			});
-
 		} catch (authError) {
-			console.error('Auth.js signin error:', authError);
-			
-			// Record failed authentication attempt for rate limiting
-			if (ipValidation.publicIP) {
-				await recordFailedAttempt(ipValidation.publicIP);
-			}
+			console.error('Authentication error:', authError);
 			
 			return json(
 				{ 

@@ -5,7 +5,7 @@ import pg from 'pg';
 async function getAccountsWithModelAccess(user: any) {
 	const { Client } = pg;
 	const client = new Client({
-		connectionString: process.env.DATABASE_URL || "postgresql://iglogin:boutiquepassword123@5.78.151.248:5432/igloginagent?sslmode=disable&connect_timeout=30"
+		connectionString: process.env.DATABASE_URL
 	});
 
 	try {
@@ -15,20 +15,17 @@ async function getAccountsWithModelAccess(user: any) {
 		let modelFilter = '';
 		const queryParams = [user.id];
 		
-		// Add model-based access for Gmail users
-		if (user.email && user.email.includes('@gmail.com')) {
-			modelFilter = `OR (model = 'Dillion' AND (account_type != 'ML_TREND_FINDER' OR account_type IS NULL))`;
-			console.log(`🔑 SQL: Adding Dillion model access for Gmail user: ${user.email}`);
-		}
+		// Use centralized model access logic instead of email-based rules
+		const { getUserModelAccess } = await import("$lib/server/model-access");
+		const userModels = getUserModelAccess(user);
 		
-		// Add model-based access for Hotmail/Live/Outlook users
-		if (user.email && (
-			user.email.includes('@hotmail.') || 
-			user.email.includes('@live.') || 
-			user.email.includes('@outlook.')
-		)) {
-			modelFilter = `OR (model = 'katie' AND (account_type != 'ML_TREND_FINDER' OR account_type IS NULL))`;
-			console.log(`🔑 SQL: Adding katie model access for Hotmail user: ${user.email}`);
+		console.log(`🔑 Analytics SQL: User ${user.email} has access to models: [${userModels.join(", ")}]`);
+		
+		if (userModels.length > 0) {
+			const modelPlaceholders = userModels.map((_, index) => `$${index + 2}`).join(", ");
+			modelFilter = `OR (model IN (${modelPlaceholders}) AND (account_type != 'ML_TREND_FINDER' OR account_type IS NULL))`;
+			queryParams.push(...userModels);
+			console.log(`🔑 Analytics SQL: Adding model access filter for models: [${userModels.join(", ")}]`);
 		}
 		
 		const accountsQuery = `

@@ -15,7 +15,7 @@ console.log('🔧 Initializing unified auth with:', {
   hasGoogleClientId: !!GOOGLE_CLIENT_ID && GOOGLE_CLIENT_ID !== 'disabled-for-ip-deployment',
   hasGoogleSecret: !!GOOGLE_CLIENT_SECRET && GOOGLE_CLIENT_SECRET !== 'disabled-for-ip-deployment',
   hasAuthSecret: !!AUTH_SECRET,
-  appUrl: PUBLIC_APP_URL || 'http://silentsignal.io'
+  appUrl: PUBLIC_APP_URL || 'https://silentsignal.io'
 });
 
 const providers: Provider[] = [];
@@ -94,7 +94,7 @@ providers.push(
   })
 );
 
-const baseUrl = PUBLIC_APP_URL || 'http://silentsignal.io';
+const baseUrl = PUBLIC_APP_URL || 'https://silentsignal.io';
 
 export const authConfig = {
   providers,
@@ -141,6 +141,17 @@ export const authConfig = {
         token.provider = account.provider;
         token.isNewUser = (user as any).isNewUser || false;
         token.accountLinked = (user as any).accountLinked || false;
+        
+        // Fetch user model from database
+        try {
+          const dbUser = await AuthService.getUserByEmail(user.email);
+          if (dbUser) {
+            token.model = dbUser.model;
+            console.log(`🔑 Model assigned to ${user.email}: ${dbUser.model}`);
+          }
+        } catch (error) {
+          console.log(`⚠️  Failed to fetch model for ${user.email}:`, (error as Error).message);
+        }
       }
       return token;
     },
@@ -151,6 +162,7 @@ export const authConfig = {
         session.user.provider = token.provider as string;
         session.user.isNewUser = token.isNewUser as boolean;
         session.user.accountLinked = token.accountLinked as boolean;
+        session.user.model = token.model as string;
       }
       return session;
     }

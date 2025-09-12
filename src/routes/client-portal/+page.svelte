@@ -70,9 +70,6 @@
 				</CardHeader>
 				<CardContent>
 					<div class="text-2xl font-bold text-white">{stats.totalAccounts}</div>
-					<p class="text-xs text-slate-400">
-						<span class="text-green-400">+2</span> from last month
-					</p>
 				</CardContent>
 			</Card>
 
@@ -88,9 +85,6 @@
 					<div class="text-2xl font-bold text-white">
 						{stats.totalFollowers.toLocaleString()}
 					</div>
-					<p class="text-xs text-slate-400">
-						<span class="text-green-400">+5.2%</span> this week
-					</p>
 				</CardContent>
 			</Card>
 		</div>

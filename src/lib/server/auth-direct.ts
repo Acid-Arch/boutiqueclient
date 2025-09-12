@@ -14,6 +14,7 @@ export interface SessionUser {
   role: string;
   subscription: string;
   isActive: boolean;
+  model?: string | null;
   lastLoginAt?: Date | null;
 }
 
@@ -102,7 +103,7 @@ export class AuthService {
       }
 
       // Update last login timestamp
-      await pgDirect.updateUserLastLogin(user.id);
+      await pgDirect.updateUserLastLogin(user.id.toString());
 
       // Log successful login attempt
       await pgDirect.logLoginAttempt({
@@ -120,7 +121,7 @@ export class AuthService {
           description: `User ${user.email} successfully logged in`
         });
       } catch (error) {
-        console.log('⚠️ Audit logging disabled due to schema mismatch:', error.message);
+        console.log('⚠️ Audit logging disabled due to schema mismatch:', error instanceof Error ? error.message : 'Unknown error');
       }
 
       // Create session user object
@@ -133,6 +134,7 @@ export class AuthService {
         role: user.role,
         subscription: user.subscription || 'Basic',
         isActive: user.active,
+        model: user.model,
         lastLoginAt: user.last_login_at
       };
 
@@ -161,11 +163,24 @@ export class AuthService {
   }
 
   /**
+   * Get user by email (for OAuth signIn callback)
+   */
+  static async getUserByEmail(email: string): Promise<any | null> {
+    try {
+      const user = await pgDirect.findUserByEmail(email);
+      return user;
+    } catch (error) {
+      console.error('Get user by email error:', error);
+      return null;
+    }
+  }
+
+  /**
    * Find user by ID using direct PostgreSQL client
    */
   static async getUserById(userId: string): Promise<SessionUser | null> {
     try {
-      const user = await pgDirect.findUserById(parseInt(userId));
+      const user = await pgDirect.findUserById(userId);
       
       if (!user) {
         return null;
@@ -180,6 +195,7 @@ export class AuthService {
         role: user.role,
         subscription: user.subscription || 'Basic',
         isActive: user.active,
+        model: user.model,
         lastLoginAt: user.last_login_at
       };
 
@@ -209,7 +225,7 @@ export class AuthService {
       const newUser = await pgDirect.createUser({
         email: userData.email,
         username: userData.username,
-        password_hash: passwordHash,
+        password_hash: passwordHash || undefined,
         first_name: userData.firstName,
         last_name: userData.lastName,
         role: userData.role || 'CLIENT'
@@ -227,7 +243,7 @@ export class AuthService {
           description: `New user registered: ${newUser.email}`
         });
       } catch (error) {
-        console.log('⚠️ User creation audit logging disabled due to schema mismatch:', error.message);
+        console.log('⚠️ User creation audit logging disabled due to schema mismatch:', error instanceof Error ? error.message : 'Unknown error');
       }
 
       return {

@@ -118,7 +118,7 @@ async function getRecentActivity(userId: string) {
 async function getRecentActivityDirectSQL(userId: string) {
 	const { Client } = pg;
 	const client = new Client({
-		connectionString: process.env.DATABASE_URL
+		connectionString: process.env.DATABASE_URL || "postgresql://iglogin:boutiquepassword123@5.78.151.248:5432/igloginagent?sslmode=disable&connect_timeout=30"
 	});
 
 	try {
@@ -174,7 +174,7 @@ function formatTimeAgo(date: Date): string {
 async function getAccountsWithModelAccess(user: any) {
 	const { Client } = pg;
 	const client = new Client({
-		connectionString: process.env.DATABASE_URL
+		connectionString: process.env.DATABASE_URL || "postgresql://iglogin:boutiquepassword123@5.78.151.248:5432/igloginagent?sslmode=disable&connect_timeout=30"
 	});
 
 	try {
@@ -184,24 +184,27 @@ async function getAccountsWithModelAccess(user: any) {
 		let modelFilter = '';
 		const queryParams = [user.id];
 		
-		// Use centralized model access logic instead of email-based rules
-		const { getUserModelAccess } = await import("$lib/server/model-access");
-		const userModels = getUserModelAccess(user);
+		// Add model-based access for Gmail users
+		if (user.email && user.email.includes('@gmail.com')) {
+			modelFilter = `OR (model = 'Dillion' AND (account_type != 'ML_TREND_FINDER' OR account_type IS NULL))`;
+			console.log(`🔑 SQL: Adding Dillion model access for Gmail user: ${user.email}`);
+		}
 		
-		console.log(`🔑 SQL: User ${user.email} has access to models: [${userModels.join(", ")}]`);
-		
-		if (userModels.length > 0) {
-			const modelPlaceholders = userModels.map((_, index) => `$${index + 2}`).join(", ");
-			modelFilter = `OR (model IN (${modelPlaceholders}) AND (account_type != 'ML_TREND_FINDER' OR account_type IS NULL))`;
-			queryParams.push(...userModels);
-			console.log(`🔑 SQL: Adding model access filter for models: [${userModels.join(", ")}]`);
+		// Add model-based access for Hotmail/Live/Outlook users
+		if (user.email && (
+			user.email.includes('@hotmail.') || 
+			user.email.includes('@live.') || 
+			user.email.includes('@outlook.')
+		)) {
+			modelFilter = `OR (model = 'katie' AND (account_type != 'ML_TREND_FINDER' OR account_type IS NULL))`;
+			console.log(`🔑 SQL: Adding katie model access for Hotmail user: ${user.email}`);
 		}
 		
 		const accountsQuery = `
 			SELECT 
 				id, instagram_username, instagram_password, email_address, email_password,
 				status, imap_status, assigned_device_id, assigned_clone_number, assigned_package_name,
-				assignment_timestamp, login_timestamp, created_at, updated_at, follower_count, following_count,
+				assignment_timestamp, login_timestamp, created_at, updated_at,
 				owner_id, account_type, visibility, is_shared, model
 			FROM ig_accounts 
 			WHERE (
@@ -234,8 +237,6 @@ async function getAccountsWithModelAccess(user: any) {
 			updatedAt: row.updated_at,
 			ownerId: row.owner_id,
 			accountType: row.account_type,
-			followerCount: row.follower_count,
-			followingCount: row.following_count,
 			visibility: row.visibility,
 			isShared: row.is_shared,
 			model: row.model
@@ -289,9 +290,8 @@ async function getDashboardStats(userId: string, user: any) {
 			account.assignedDeviceId !== null
 		).length;
 		
-		// Calculate real follower count from account data
-		const totalFollowers = accounts.reduce((sum, account) => sum + (account.followerCount || 0), 0);
-		console.log(`📊 Dashboard: Calculated ${totalFollowers} total followers from ${accounts.length} accounts`);
+		// TODO: Get follower count from metrics table when available
+		const totalFollowers = 0;
 
 		return {
 			totalAccounts,

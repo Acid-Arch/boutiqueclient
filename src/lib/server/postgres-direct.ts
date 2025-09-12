@@ -77,7 +77,7 @@ class PostgresDirectClient {
     async findUserByEmail(email: string): Promise<any | null> {
         try {
             const result = await this.query(
-                'SELECT id, email, name, password_hash, role, active, email_verified FROM users WHERE email = $1',
+                'SELECT id, email, name, password_hash, role, model, active, email_verified, company, avatar_url as avatar, subscription, last_login_at FROM users WHERE email = $1',
                 [email]
             );
             return result.rows[0] || null;
@@ -87,10 +87,10 @@ class PostgresDirectClient {
         }
     }
 
-    async findUserById(id: number): Promise<any | null> {
+    async findUserById(id: string): Promise<any | null> {
         try {
             const result = await this.query(
-                'SELECT id, email, name, role, active, email_verified FROM users WHERE id = $1',
+                'SELECT id, email, name, role, model, active, email_verified, company, avatar_url as avatar, subscription, last_login_at FROM users WHERE id = $1',
                 [id]
             );
             return result.rows[0] || null;
@@ -110,9 +110,9 @@ class PostgresDirectClient {
     }): Promise<any | null> {
         try {
             const result = await this.query(
-                `INSERT INTO users (email, username, password_hash, first_name, last_name, role, is_active, email_verified, created_at, updated_at)
+                `INSERT INTO "User" (email, username, "passwordHash", "firstName", "lastName", role, "isActive", "emailVerified", "createdAt", "updatedAt")
                  VALUES ($1, $2, $3, $4, $5, $6, true, false, NOW(), NOW())
-                 RETURNING id, email, username, role, is_active, email_verified`,
+                 RETURNING id, email, username, role, "isActive" as is_active, "emailVerified" as email_verified`,
                 [
                     userData.email,
                     userData.username,
@@ -129,7 +129,7 @@ class PostgresDirectClient {
         }
     }
 
-    async updateUserLastLogin(userId: number): Promise<boolean> {
+    async updateUserLastLogin(userId: string): Promise<boolean> {
         try {
             await this.query(
                 'UPDATE users SET last_login_at = NOW(), updated_at = NOW() WHERE id = $1',

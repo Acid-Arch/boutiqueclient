@@ -81,10 +81,9 @@ pre_deployment_checks() {
         warning "Disk usage is at ${disk_usage}% - consider cleaning up"
     fi
     
-    # Check if required directories exist
+    # Check if required directories exist - use server-side script to avoid multiple sudo calls
     info "Ensuring directory structure..."
-    run_remote "$SERVER_USER" "mkdir -p $APP_DIR $LOG_DIR $BACKUP_DIR" true
-    run_remote "$SERVER_USER" "chown -R $SERVICE_USER:users $APP_DIR" true
+    echo "$SUDO_PASSWORD" | timeout 30 ssh -i ~/.ssh/github-actions-boutique -o StrictHostKeyChecking=no -o ServerAliveInterval=10 "$SERVER_USER@$SERVER_IP" "sudo -S /tmp/server-deploy-script.sh"
     
     log "✅ Pre-deployment checks completed"
 }
@@ -136,11 +135,8 @@ deploy_application() {
     info "Transferring application files..."
     copy_to_server "boutique-client-$DEPLOYMENT_ID.tar.gz" "/tmp/" "$SERVER_USER"
     
-    # Extract on server
+    # Extract on server (directories already set up by server script)
     info "Extracting application files..."
-    run_remote "$SERVER_USER" "rm -rf $APP_DIR/app-new" true
-    run_remote "$SERVER_USER" "mkdir -p $APP_DIR/app-new" true
-    run_remote "$SERVER_USER" "chown $SERVICE_USER:users $APP_DIR/app-new" true
     run_remote "$SERVICE_USER" "cd $APP_DIR && tar -xzf /tmp/boutique-client-$DEPLOYMENT_ID.tar.gz -C app-new"
     
     # Install dependencies

@@ -2,7 +2,8 @@
 
 Testing automatic deployment with DEPLOYMENT_SSH_KEY.
 
-**Timestamp**: 2025-09-12 15:15:00
+**Timestamp**: 2025-09-12 15:35:00  
+**SSH Key**: RSA-4096 (Updated for GitHub Actions compatibility)
 
 **Production Server**: 5.78.147.68:3000  
 **Domain**: silentsignal.io (proxied via nginx)

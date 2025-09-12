@@ -83,7 +83,9 @@ pre_deployment_checks() {
     
     # Check if required directories exist - use server-side script to avoid multiple sudo calls
     info "Ensuring directory structure..."
-    echo "$SUDO_PASSWORD" | timeout 30 ssh -i ~/.ssh/github-actions-boutique -o StrictHostKeyChecking=no -o ServerAliveInterval=10 "$SERVER_USER@$SERVER_IP" "sudo -S /tmp/server-deploy-script.sh"
+    copy_to_server "scripts/server-deploy.sh" "/tmp/server-deploy.sh" "$SERVER_USER"
+    run_remote "$SERVER_USER" "chmod +x /tmp/server-deploy.sh"
+    echo "$SUDO_PASSWORD" | timeout 30 ssh -i ~/.ssh/github-actions-boutique -o StrictHostKeyChecking=no -o ServerAliveInterval=10 "$SERVER_USER@$SERVER_IP" "sudo -S /tmp/server-deploy.sh"
     
     log "✅ Pre-deployment checks completed"
 }

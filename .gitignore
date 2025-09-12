@@ -129,6 +129,11 @@ Desktop.ini
 .idea/tasks.xml
 *.sublime-workspace
 
+# Deployment artifacts
+*.tar.gz
+deployment-package/
+boutique-*.tar.gz
+
 # SECURITY WARNING: Double-check that no sensitive files are tracked
 # Use 'git status --ignored' to see ignored files
 # Use 'git log --oneline --name-only' to check for accidentally committed secrets

@@ -46,10 +46,12 @@ run_remote() {
     local use_sudo=${3:-false}
     
     if [ "$use_sudo" = "true" ]; then
-        # Use the password from environment variable for sudo operations
-        echo "$SUDO_PASSWORD" | ssh -i ~/.ssh/github-actions-boutique -o StrictHostKeyChecking=no "$user@$SERVER_IP" "sudo -S $cmd"
+        # Use the password from environment variable for sudo operations with timeout to avoid hanging
+        echo "$SUDO_PASSWORD" | timeout 30 ssh -i ~/.ssh/github-actions-boutique -o StrictHostKeyChecking=no -o ServerAliveInterval=10 "$user@$SERVER_IP" "sudo -S $cmd"
+        # Add small delay to prevent rapid authentication attempts
+        sleep 2
     else
-        ssh -i ~/.ssh/github-actions-boutique -o StrictHostKeyChecking=no "$user@$SERVER_IP" "$cmd"
+        timeout 30 ssh -i ~/.ssh/github-actions-boutique -o StrictHostKeyChecking=no -o ServerAliveInterval=10 "$user@$SERVER_IP" "$cmd"
     fi
 }
 
@@ -59,7 +61,7 @@ copy_to_server() {
     local remote_path=$2
     local user=${3:-$SERVER_USER}
     log "Copying $local_file to $user@$SERVER_IP:$remote_path"
-    scp -i ~/.ssh/github-actions-boutique -o StrictHostKeyChecking=no "$local_file" "$user@$SERVER_IP:$remote_path"
+    timeout 60 scp -i ~/.ssh/github-actions-boutique -o StrictHostKeyChecking=no -o ServerAliveInterval=10 "$local_file" "$user@$SERVER_IP:$remote_path"
 }
 
 # Pre-deployment checks

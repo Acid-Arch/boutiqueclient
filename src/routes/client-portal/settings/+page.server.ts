@@ -156,7 +156,7 @@ async function getUserDetailsDirectSQL(user: any) {
 		const userQuery = `
 			SELECT 
 				id, email, name, company, role,
-				is_active, is_two_factor_enabled, avatar, subscription,
+				active, is_two_factor_enabled, avatar, subscription,
 				created_at, updated_at, last_login_at
 			FROM users 
 			WHERE id = $1 OR email = $2
@@ -173,7 +173,7 @@ async function getUserDetailsDirectSQL(user: any) {
 				name: row.name || row.email,
 				company: row.company,
 				role: row.role,
-				isActive: row.is_active,
+				isActive: row.active,
 				twoFactorEnabled: row.is_two_factor_enabled,
 				avatar: row.avatar,
 				subscription: row.subscription,

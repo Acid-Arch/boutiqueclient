@@ -276,9 +276,6 @@ jobs:
         with:
           name: deployment-package
 
-      - name: Rename deployment package
-        run: mv boutique-client-${{ github.sha }}.tar.gz boutique-client-${{ github.sha }}.tar.gz
-
       - name: Deploy to production server
         env:
           SERVER_IP: ${{ secrets.SERVER_IP }}
